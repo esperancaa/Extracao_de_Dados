@@ -6,25 +6,25 @@ query_LGG <- GDCquery(project = "TCGA-LGG",
 GDCdownload(query_LGG)
 data_rna_LGG <- GDCprepare(query_LGG, summarizedExperiment = TRUE) #guardamos os nossos dados e os metadados
 data_rna_LGG <- GDCprepare(query_LGG, summarizedExperiment = TRUE, save = TRUE, save.filename = "TCGA_LGG.rda")
-load("TCGA_LGG.rda") #para ser mais fácil aceder aos dados
+load("TCGA_LGG.rda") #para ser mais f?cil aceder aos dados
 class(data_rna_LGG)
-dim(data_rna_LGG) #ver o nº de linhas e colunas
-names(data_rna_LGG) #cada linha é um gene 
-colnames(data_rna_LGG) #cada coluna é uma amostra-paciente
+dim(data_rna_LGG) #ver o n? de linhas e colunas
+names(data_rna_LGG) #cada linha ? um gene 
+colnames(data_rna_LGG) #cada coluna ? uma amostra-paciente
 
 library(Biobase)
 meta_LGG = colData(data_rna_LGG) #buscar apenas os metadadaos
-dim(meta_LGG) #ver as suas dimensões onte as linhas são pacientes e as colunas
+dim(meta_LGG) #ver as suas dimens?es onte as linhas s?o pacientes e as colunas
 
 cols_with_not_reported <- which(sapply(meta_LGG,function(x) sum(x == "not reported", na.rm = TRUE)) > 50)
 cols_with_Not_Reported <- which(sapply(meta_LGG,function(x) sum(x == "Not Reported", na.rm = TRUE)) > 50)
 cols_with_NA <- which(sapply(meta_LGG, function(x) sum(is.na(x))) > 50)
 metadata_matriz_clean <- meta_LGG[, -c(cols_with_not_reported, cols_with_Not_Reported, cols_with_NA)] #retirar as colunas que nao queremos
-dim(metadata_matriz_clean) #vamos trabalahr a partir desta já filtrada
+dim(metadata_matriz_clean) #vamos trabalahr a partir desta j? filtrada
 
 freq_table <- table(metadata_matriz_clean$primary_diagnosis)
 pie(freq_table,
-    main = "Distribuição de diagnósticos primários",
+    main = "Distribui??o de diagn?sticos prim?rios",
     col = rainbow(length(freq_table)),
     border = "white",
     labels = paste(names(freq_table), ": ", freq_table, sep = ""))
@@ -32,33 +32,34 @@ pie(freq_table,
 
 counts <- table(metadata_matriz_clean$gender)
 colors <- c("pink", "lightblue")
-pie(counts, col = colors, main = "Distribuição por género")
-legend("topright", legend = names(counts), fill = colors) #gráfico circulas para mostrar a distribuição de genero
+pie(counts, col = colors, main = "Distribui??o por g?nero")
+legend("topright", legend = names(counts), fill = colors) #gr?fico circulas para mostrar a distribui??o de genero
 
-chisq.test(counts) # para ver estatisticamente se há diferenças entre male e female , sem bem que isso em termos bio nao diz muito nesta fase
+chisq.test(counts) # para ver estatisticamente se h? diferen?as entre male e female , sem bem que isso em termos bio nao diz muito nesta fase
 
-sem_NA=na.omit(metadata_matriz_clean$age_at_index) #pré-filtragem
-hist(sem_NA, breaks = seq(10, 90, 10), main = "Idades dos pacientes", xlab = "Faixa etária", ylab = "Frequência") # facilitar a visualização com um histograma
+sem_NA=na.omit(metadata_matriz_clean$age_at_index) #pr?-filtragem
+dim(sem_NA)
+hist(sem_NA, breaks = seq(10, 90, 10), main = "Idades dos pacientes", xlab = "Faixa et?ria", ylab = "Frequ?ncia") # facilitar a visualiza??o com um histograma
 summary(sem_NA)
 sd(sem_NA)
-shapiro.test(sem_NA) #verificar a normalidade; pvalue <0.05 portanto nao tem distribuição normal
+shapiro.test(sem_NA) #verificar a normalidade; pvalue <0.05 portanto nao tem distribui??o normal
 
 merged_data <- data.frame(status_vital = (metadata_matriz_clean$vital_status), 
                           idade_diagnostico = (metadata_matriz_clean$age_at_index))
-merged_data #junção das duas coluans de metadados que queremos analisar
+merged_data #jun??o das duas coluans de metadados que queremos analisar
 merged_data <- na.omit(merged_data)
 index_not_reported <- which(apply(merged_data, 1, function(x) any(x == "Not Reported")))
 merged_data_clean <- subset(merged_data, !row.names(merged_data) %in% index_not_reported)
 boxplot(idade_diagnostico ~ status_vital, data = merged_data_clean, 
-        main = "Idade de diagnóstico por status vital",
-        xlab = "Status vital", ylab = "Idade de diagnóstico")
+        main = "Idade de diagn?stico por status vital",
+        xlab = "Status vital", ylab = "Idade de diagn?stico")
 means <- tapply(merged_data_clean$idade_diagnostico, merged_data_clean$status_vital, mean)
 points(means, col = "red", pch = 18, cex = 2, lwd = 2, add = TRUE)
 
 dead_data <- subset(merged_data_clean, merged_data_clean$status_vital == "Dead") #assocair aos mortos
 alive_data <- subset(merged_data_clean, merged_data_clean$status_vital == "Alive") #associar apenas os vivo
-var_test <- var.test(alive_data$idade_diagnostico, dead_data$idade_diagnostico) #ver se as variancia sao true or false ; sáo false mas muito perto de 0.05
-resultado_teste <- t.test(alive_data$idade_diagnostico, dead_data$idade_diagnostico,var.equal = FALSE) #pvalue <0.05 que sugere que há uma diferença real entre as idades de diagnóstico dos pacientes vivos e falecidos.
+var_test <- var.test(alive_data$idade_diagnostico, dead_data$idade_diagnostico) #ver se as variancia sao true or false ; s?o false mas muito perto de 0.05
+resultado_teste <- t.test(alive_data$idade_diagnostico, dead_data$idade_diagnostico,var.equal = FALSE) #pvalue <0.05 que sugere que h? uma diferen?a real entre as idades de diagn?stico dos pacientes vivos e falecidos.
 
 
 merged_data_3 <- data.frame(status_vital = metadata_matriz_clean$vital_status, 
@@ -71,14 +72,14 @@ merged_data_clean_3 <- subset(merged_data_3_clean, !row.names(merged_data) %in% 
 dim(merged_data_clean_3)
 tabela <- table(merged_data_clean_3$status_vital, merged_data_clean_3$idade_diagnostico, merged_data_clean_3$gender)
 
-# Criar novo dataframe apenas com informações relevantes
+# Criar novo dataframe apenas com informa??es relevantes
 dead_data <- subset(merged_data_clean_3, merged_data_clean_3$status_vital == "Dead")
 alive_data <- subset(merged_data_clean_3, merged_data_clean_3$status_vital == "Alive")
 
 # Configurar cores das barras
 cores <- c("pink", "lightblue")
 
-# Criar tabela de contingência
+# Criar tabela de conting?ncia
 tabela_dead <- table(dead_data$gender, cut(dead_data$idade_diagnostico, breaks = seq(10, 90, 10)))
 tabela_alive <- table(alive_data$gender, cut(alive_data$idade_diagnostico, breaks = seq(10, 90, 10)))
 
@@ -88,26 +89,132 @@ colnames(tabela_alive) <- paste("Alive", colnames(tabela_alive))
 rownames(tabela_dead) <- c("Female", "Male")
 rownames(tabela_alive) <- c("Female", "Male")
 
-# Criar gráfico de barras
+# Criar gr?fico de barras
 barplot(cbind(tabela_dead, tabela_alive), beside = TRUE, col = cores,
-        main = "Comparação entre pacientes mortos e vivos",
+        main = "Compara??o entre pacientes mortos e vivos",
         xlab = "Sexo", ylab = "Contagem",
         legend.text = c("Female", "Male"), args.legend = list(x = "topright"))
 
 library(DESeq2)
-data_de <- data_rna_LGG[,!is.na(data_rna_LGG$paper_IDH.status)] #as amostras que possuem uma condição definida, excluindo aquelas com valor "NA" (que representa dados ausentes).
-ddsSE <- DESeqDataSet(data_de, design = ~ paper_IDH.status) #estamos a comparar a expressão genética com os grupos existentes em design,neste caso mutante e wildtype
-rowSums(counts(ddsSE))>=10 #A segunda linha cria um objeto DESeqDataSet, que contém as contagens de expressão gênica e o design experimental. A variável a ser testada é especificada. Neste caso, estamos comparando os grupos Mutant e Wildtype:
-# Extrair as colunas onde a soma das linhas é <= 10
+data_de <- data_rna_LGG[,!is.na(data_rna_LGG$paper_IDH.status)] #as amostras que possuem uma condi??o definida, excluindo aquelas com valor "NA" (que representa dados ausentes).
+ddsSE <- DESeqDataSet(data_de, design = ~ paper_IDH.status) #estamos a comparar a express?o gen?tica com os grupos existentes em design,neste caso mutante e wildtype
+rowSums(counts(ddsSE))>=10 #A segunda linha cria um objeto DESeqDataSet, que cont?m as contagens de express?o g?nica e o design experimental. A vari?vel a ser testada ? especificada. Neste caso, estamos comparando os grupos Mutant e Wildtype:
+# Extrair as colunas onde a soma das linhas ? <= 10
 keep <- which(rowSums(counts(ddsSE) >= 10) >= 3) #filtragem aprofundada 
-ddsSE_filtrado <- ddsSE[keep, ] #apenas colocar os genes que têm umas counts acima de 10  e tem de ter pelo menos 10,10,10 nao pode ter tudo zero e um 11
+ddsSE_filtrado <- ddsSE[keep, ] #apenas colocar os genes que t?m umas counts acima de 10  e tem de ter pelo menos 10,10,10 nao pode ter tudo zero e um 11
 
-ddsSE_norm <- DESeq(ddsSE_filtrado) # Essa função realiza a normalização dos dados, estima os parâmetros do modelo e realiza o teste de hipótese para cada gene.
-resultsNames(ddsSE_norm) # extrai o nome da coluna que contém as diferenças entre as condições Mutant e Wildtype:
+ddsSE_norm <- DESeq(ddsSE_filtrado) # Essa fun??o realiza a normaliza??o dos dados, estima os par?metros do modelo e realiza o teste de hip?tese para cada gene.
+resultsNames(ddsSE_norm) # extrai o nome da coluna que cont?m as diferen?as entre as condi??es Mutant e Wildtype:
 res <- results(ddsSE_norm, name = "paper_IDH.status_WT_vs_Mutant") #vai de encontro ao grupo de metadados escolhido em cima com design
-dea <- as.data.frame(res) # converte o objeto "res" em um data frame para facilitar a visualização dos resultados
+dea <- as.data.frame(res) # converte o objeto "res" em um data frame para facilitar a visualiza??o dos resultados
 
-# Seleciona as expressões dos genes diferencialmente expressos
+# Seleciona as express?es dos genes diferencialmente expressos
 de_genes <- rownames(res)[which(dea$padj < 0.05)] #probabilidade inferior a 5 % de encontrar um falso positivo
 plotMA(res, main="DESeq2", ylim=c(-2,2))
+
+
+#PARTE NOVAAAAAAAAAA:
+res
+nrow(res)
+mcols(res, use.names = TRUE)
+#Adaptar este texto Ã  nossa problemÃ¡tica:
+
+#A primeira coluna, baseMean, Ã© apenas a mÃ©dia dos valores de contagem normalizados, divididos pelos factores de tamanho, recolhidos em todas as amostras do conjunto de dados DESeq. 
+#As restantes quatro colunas referem-se a um contraste especÃ­fico, nomeadamente a comparaÃ§Ã£o do nÃ­vel trt sobre o nÃ­vel untrt para a variÃ¡vel factor dex. A seguir descobriremos como obter 
+#outros contrastes. A coluna log2FoldChange Ã© a estimativa do tamanho do efeito. Ela diz-nos quanto a expressÃ£o do gene parece ter mudado devido ao tratamento com dexametasona em comparaÃ§Ã£o 
+#com amostras nÃ£o tratadas. Este valor Ã© reportado numa escala logarÃ­tmica Ã  base 2: por exemplo, uma alteraÃ§Ã£o de 1,5 da dobra log2 significa que a expressÃ£o do gene Ã© aumentada por um 
+#factor multiplicativo de 21.5â‰ˆ2.82.Evidentemente, esta estimativa tem uma incerteza associada, que estÃ¡ disponÃ­vel na coluna lfcSE, a estimativa de erro padrÃ£o para a estimativa da 
+#mudanÃ§a de log2 fold. Podemos tambÃ©m expressar a incerteza de uma estimativa de tamanho de efeito particular como resultado de um teste estatÃ­stico. O objectivo de um teste de 
+#expressÃ£o diferencial Ã© testar se os dados fornecem provas suficientes para concluir que este valor Ã© realmente diferente de zero. DESeq2 executa para cada gene um teste de hipÃ³tese 
+#ver se a evidÃªncia Ã© suficiente para decidir contra a hipÃ³tese nula de que existe efeito zero do tratamento no gene e que a diferenÃ§a observada entre tratamento e controlo foi meramente 
+#causada pela variabilidade experimental (ou seja, o tipo de variabilidade que se pode esperar entre diferentes amostras no mesmo grupo de tratamento). Como Ã© habitual nas estatÃ­sticas, 
+#o resultado deste teste Ã© reportado como um valor p, e Ã© encontrado na coluna pvalue. Lembre-se que um valor de p indica a probabilidade de uma dobra mudar tÃ£o forte como a observada, 
+#ou ainda mais forte, seria vista sob a situaÃ§Ã£o descrita pela hipÃ³tese nula. Podemos tambÃ©m resumir os resultados com a seguinte linha de cÃ³digo, que reporta alguma informaÃ§Ã£o adicional, 
+#que serÃ¡ coberta em secÃ§Ãµes posteriores.
+
+summary(res)
+
+#Note-se que existem muitos genes com expressÃ£o diferencial devido ao tratamento com dexametasona ao nÃ­vel de FDR de 10%. No entanto, hÃ¡ duas maneiras de ser mais rigoroso sobre que 
+#conjunto de genes sÃ£o considerados significativos: baixar o limiar da falsa taxa de descoberta (o limiar do padj na tabela de resultados) aumentar o limiar de mudanÃ§a de log2 fold de 0 
+#usando o argumento de resultados lfcThreshold. Se baixarmos o limiar da taxa de falsa descoberta, devemos tambÃ©m informar a funÃ§Ã£o de resultados() sobre ela, para que a funÃ§Ã£o possa 
+#utilizar este limiar para a filtragem independente Ã³ptima que realiza:
+
+hist(dea$pvalue, breaks=20,col = "grey", border = "white", xlab = "P-value",
+     ylab = "Number of genes", main = "P-value value distribution") #hist para vizualizar o p.value
+
+pvalue_fi= sum(dea$pvalue < 0.05, na.rm=TRUE)#filtragem por pvalue normal
+pvalue_fi
+
+#Existem 23323 genes com um valor de p inferior a 0,05 entre os 32648 genes para os quais o teste conseguiu reportar um valor de p:
+  
+#Agora, assumir por um momento que a hipÃ³tese nula Ã© verdadeira para todos os genes. EntÃ£o, pela definiÃ§Ã£o do valor p, 
+#esperamos que atÃ© 5% dos genes tenham um valor p inferior a 0,05. Isto equivale a 1632 genes. Se considerarmos apenas a lista de genes com um valor de p inferior a 0,05 como 
+#diferentemente expresso, esta lista deverÃ¡, portanto, conter atÃ© 1632 / 23323 = 6% de falsos positivos.
+#Assim, se considerarmos aceitÃ¡vel uma fracÃ§Ã£o de 1 percent de falsos positivos, podemos considerar todos os genes com um valor p ajustado inferior a 1% = 0,01 como significativos. 
+
+hist(dea$padj, breaks=20,col = "grey", border = "white", xlab = "P-adj",
+     ylab = "Number of genes", main = "P-adj value distribution") #hist para vizualizar o padj
+
+padj_fi= sum(dea$padj < 0.01, na.rm=TRUE) #probabilidade inferior a 1 % de encontrar um falso positivo 
+padj_fi
+
+#ficamos entÃ£o com 20126 genes
+
+
+
+#analise de grÃ¡fico:
+
+
+topGene <- rownames(res)[which.min(res$padj)] #gene com maior expressÃ£o
+plotCounts(ddsSE_norm, gene = topGene, intgroup=c("paper_IDH.status")) #GrÃ¡fico que mostra as contagens do gene com maior expressÃ£o para a condiÃ§Ã£o Mutante, e para a condiÃ§Ã£o normal
+
+install.packages("ggbeeswarm")
+library("ggbeeswarm")
+
+geneCounts <- plotCounts(ddsSE_norm, gene = topGene, intgroup = c("paper_IDH.status","vital_status"), # relacionar a mutaÃ§Ã£o com o facto de estar vivo ou morto
+                         returnData = TRUE)
+ggplot(geneCounts, aes(x = paper_IDH.status, y = count, color = vital_status)) + 
+  scale_y_log10() +  geom_beeswarm(cex = 3)  # criar o grÃ¡fico para vizualizar melhor. podemos explorar isto muito melhor
+
+install.packages("apeglm")
+library("apeglm")
+
+# com todos os genes:
+plotMA(ddsSE_norm, ylim = c(-10, 10)) #pontos a azul sÃ£o diferencialmente expressos, a cinza nÃ£o sÃ£o. vai de encontro aos nossos testes
+
+
+with(res[topGene, ], {
+  points(baseMean, log2FoldChange, col="green", cex=2, lwd=2)
+  text(baseMean, log2FoldChange, topGene, pos=2, col="green")
+})
+
+#apenas com o top 100
+top_100_genes <- res[order(dea$padj)[1:100],]
+plotMA(top_100_genes, main="DESeq2", ylim=c(-10,10))
+
+with(top_100_genes[topGene, ], {
+  points(baseMean, log2FoldChange, col="green", cex=2, lwd=2)
+  text(baseMean, log2FoldChange, topGene, pos=2, col="green")
+})
+
+#heatmap:
+metadata_matriz_clean$paper_IDH.status
+
+sem_NA2=na.omit(metadata_matriz_clean$paper_IDH.status)
+
+sem_NA2
+
+top_20_genes <- res[order(dea$padj)[1:20],]
+nova_tabela <- subset(top_20_genes, select = c("padj", "pvalue"))
+nova_tabela
+nova_matriz <- data.matrix(nova_tabela)
+nova_matriz
+
+# Replace missing values with the minimum value in the matrix
+min_val <- min(nova_matriz, na.rm = TRUE)
+nova_matriz[is.na(nova_matriz)] <- min_val
+
+# Create heatmap
+heatmap(nova_matriz, Colv = NA, labCol = sem_NA2)
+
 
