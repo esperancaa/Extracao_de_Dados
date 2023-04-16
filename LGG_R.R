@@ -94,5 +94,20 @@ barplot(cbind(tabela_dead, tabela_alive), beside = TRUE, col = cores,
         xlab = "Sexo", ylab = "Contagem",
         legend.text = c("Female", "Male"), args.legend = list(x = "topright"))
 
+library(DESeq2)
+data_de <- data_rna_LGG[,!is.na(data_rna_LGG$paper_IDH.status)] #as amostras que possuem uma condição definida, excluindo aquelas com valor "NA" (que representa dados ausentes).
+ddsSE <- DESeqDataSet(data_de, design = ~ paper_IDH.status) #estamos a comparar a expressão genética com os grupos existentes em design,neste caso mutante e wildtype
+rowSums(counts(ddsSE))>=10 #A segunda linha cria um objeto DESeqDataSet, que contém as contagens de expressão gênica e o design experimental. A variável a ser testada é especificada. Neste caso, estamos comparando os grupos Mutant e Wildtype:
+# Extrair as colunas onde a soma das linhas é <= 10
+keep <- which(rowSums(counts(ddsSE) >= 10) >= 3) #filtragem aprofundada 
+ddsSE_filtrado <- ddsSE[keep, ] #apenas colocar os genes que têm umas counts acima de 10  e tem de ter pelo menos 10,10,10 nao pode ter tudo zero e um 11
 
+ddsSE_norm <- DESeq(ddsSE_filtrado) # Essa função realiza a normalização dos dados, estima os parâmetros do modelo e realiza o teste de hipótese para cada gene.
+resultsNames(ddsSE_norm) # extrai o nome da coluna que contém as diferenças entre as condições Mutant e Wildtype:
+res <- results(ddsSE_norm, name = "paper_IDH.status_WT_vs_Mutant") #vai de encontro ao grupo de metadados escolhido em cima com design
+dea <- as.data.frame(res) # converte o objeto "res" em um data frame para facilitar a visualização dos resultados
+
+# Seleciona as expressões dos genes diferencialmente expressos
+de_genes <- rownames(res)[which(dea$padj < 0.05)] #probabilidade inferior a 5 % de encontrar um falso positivo
+plotMA(res, main="DESeq2", ylim=c(-2,2))
 
