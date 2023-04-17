@@ -21,7 +21,8 @@ cols_with_Not_Reported <- which(sapply(meta_LGG,function(x) sum(x == "Not Report
 cols_with_NA <- which(sapply(meta_LGG, function(x) sum(is.na(x))) > 50)
 metadata_matriz_clean <- meta_LGG[, -c(cols_with_not_reported, cols_with_Not_Reported, cols_with_NA)] #retirar as colunas que nao queremos
 dim(metadata_matriz_clean) #vamos trabalahr a partir desta j? filtrada
-
+metadados_teste=as.data.frame(metadata_matriz_clean)
+summary(metadados_teste)
 freq_table <- table(metadata_matriz_clean$primary_diagnosis)
 pie(freq_table,
     main = "Distribui??o de diagn?sticos prim?rios",
@@ -110,50 +111,30 @@ dea <- as.data.frame(res) # converte o objeto "res" em um data frame para facili
 
 # Seleciona as express?es dos genes diferencialmente expressos
 de_genes <- rownames(res)[which(dea$padj < 0.05)] #probabilidade inferior a 5 % de encontrar um falso positivo
-plotMA(res, main="DESeq2", ylim=c(-2,2))
 
 
 #PARTE NOVAAAAAAAAAA:
 res
-nrow(res)
-mcols(res, use.names = TRUE)
-#Adaptar este texto à nossa problemática:
+mcols(res, use.names = TRUE) # d� as  seis linhas  que ajudam mais tarde na interpreta��o dos dados
 
-#A primeira coluna, baseMean, é apenas a média dos valores de contagem normalizados, divididos pelos factores de tamanho, recolhidos em todas as amostras do conjunto de dados DESeq. 
-#As restantes quatro colunas referem-se a um contraste específico, nomeadamente a comparação do nível trt sobre o nível untrt para a variável factor dex. A seguir descobriremos como obter 
-#outros contrastes. A coluna log2FoldChange é a estimativa do tamanho do efeito. Ela diz-nos quanto a expressão do gene parece ter mudado devido ao tratamento com dexametasona em comparação 
-#com amostras não tratadas. Este valor é reportado numa escala logarítmica à base 2: por exemplo, uma alteração de 1,5 da dobra log2 significa que a expressão do gene é aumentada por um 
-#factor multiplicativo de 21.5≈2.82.Evidentemente, esta estimativa tem uma incerteza associada, que está disponível na coluna lfcSE, a estimativa de erro padrão para a estimativa da 
-#mudança de log2 fold. Podemos também expressar a incerteza de uma estimativa de tamanho de efeito particular como resultado de um teste estatístico. O objectivo de um teste de 
-#expressão diferencial é testar se os dados fornecem provas suficientes para concluir que este valor é realmente diferente de zero. DESeq2 executa para cada gene um teste de hipótese 
-#ver se a evidência é suficiente para decidir contra a hipótese nula de que existe efeito zero do tratamento no gene e que a diferença observada entre tratamento e controlo foi meramente 
-#causada pela variabilidade experimental (ou seja, o tipo de variabilidade que se pode esperar entre diferentes amostras no mesmo grupo de tratamento). Como é habitual nas estatísticas, 
-#o resultado deste teste é reportado como um valor p, e é encontrado na coluna pvalue. Lembre-se que um valor de p indica a probabilidade de uma dobra mudar tão forte como a observada, 
-#ou ainda mais forte, seria vista sob a situação descrita pela hipótese nula. Podemos também resumir os resultados com a seguinte linha de código, que reporta alguma informação adicional, 
-#que será coberta em secções posteriores.
 
-summary(res)
 
-#Note-se que existem muitos genes com expressão diferencial devido ao tratamento com dexametasona ao nível de FDR de 10%. No entanto, há duas maneiras de ser mais rigoroso sobre que 
-#conjunto de genes são considerados significativos: baixar o limiar da falsa taxa de descoberta (o limiar do padj na tabela de resultados) aumentar o limiar de mudança de log2 fold de 0 
-#usando o argumento de resultados lfcThreshold. Se baixarmos o limiar da taxa de falsa descoberta, devemos também informar a função de resultados() sobre ela, para que a função possa 
-#utilizar este limiar para a filtragem independente óptima que realiza:
+summary(res) # temos mais genes expressos associados ao mutante
+
+plotMA(res, main="DESeq2", ylim=c(-10,10)) # mostra a azul os genes diferencialente expressos
+
 
 hist(dea$pvalue, breaks=20,col = "grey", border = "white", xlab = "P-value",
      ylab = "Number of genes", main = "P-value value distribution") #hist para vizualizar o p.value
 
+genes_pvalue_fi <- rownames(res)[which(dea$pvalue < 0.05)]
 pvalue_fi= sum(dea$pvalue < 0.05, na.rm=TRUE)#filtragem por pvalue normal
-pvalue_fi
 
-#Existem 23323 genes com um valor de p inferior a 0,05 entre os 32648 genes para os quais o teste conseguiu reportar um valor de p:
-  
-#Agora, assumir por um momento que a hipótese nula é verdadeira para todos os genes. Então, pela definição do valor p, 
-#esperamos que até 5% dos genes tenham um valor p inferior a 0,05. Isto equivale a 1632 genes. Se considerarmos apenas a lista de genes com um valor de p inferior a 0,05 como 
-#diferentemente expresso, esta lista deverá, portanto, conter até 1632 / 23323 = 6% de falsos positivos.
-#Assim, se considerarmos aceitável uma fracção de 1 percent de falsos positivos, podemos considerar todos os genes com um valor p ajustado inferior a 1% = 0,01 como significativos. 
 
 hist(dea$padj, breaks=20,col = "grey", border = "white", xlab = "P-adj",
      ylab = "Number of genes", main = "P-adj value distribution") #hist para vizualizar o padj
+
+genes_padj_fi <- rownames(res)[which(dea$padj < 0.01)]
 
 padj_fi= sum(dea$padj < 0.01, na.rm=TRUE) #probabilidade inferior a 1 % de encontrar um falso positivo 
 padj_fi
@@ -164,7 +145,7 @@ padj_fi
 
 #analise de gráfico:
 
-
+library(ggplot2)
 topGene <- rownames(res)[which.min(res$padj)] #gene com maior expressão
 plotCounts(ddsSE_norm, gene = topGene, intgroup=c("paper_IDH.status")) #Gráfico que mostra as contagens do gene com maior expressão para a condição Mutante, e para a condição normal
 
@@ -178,10 +159,6 @@ ggplot(geneCounts, aes(x = paper_IDH.status, y = count, color = vital_status)) +
 
 install.packages("apeglm")
 library("apeglm")
-
-# com todos os genes:
-plotMA(ddsSE_norm, ylim = c(-10, 10)) #pontos a azul são diferencialmente expressos, a cinza não são. vai de encontro aos nossos testes
-
 
 with(res[topGene, ], {
   points(baseMean, log2FoldChange, col="green", cex=2, lwd=2)
@@ -214,7 +191,21 @@ nova_matriz
 min_val <- min(nova_matriz, na.rm = TRUE)
 nova_matriz[is.na(nova_matriz)] <- min_val
 
-# Create heatmap
-heatmap(nova_matriz, Colv = NA, labCol = sem_NA2)
+#heatmap
+
+
+BiocManager::install("genefilter", force = TRUE)
+library("genefilter")
+library("pheatmap")
+
+vsd <- varianceStabilizingTransformation(ddsSE_norm, blind = FALSE)
+resOrdered <- res[order(res$padj),]
+select <- rownames(head(resOrdered,20))
+vsd.counts <- assay(vsd)[select,]
+df <- as.data.frame(colData(ddsSE_norm)[,c("paper_IDH.status")])
+
+anno <- as.data.frame(colData(vsd)[, c("paper_IDH.status", "vital_status")])
+
+pheatmap(vsd.counts, show_colnames = F, annotation_col =anno , main="20 genes com maior diferen�a de express�o\n entre os mutantes e n�o mutantes")
 
 

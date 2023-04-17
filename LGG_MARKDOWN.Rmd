@@ -3,6 +3,7 @@ title: "Glioblastoma"
 author: "Guilherme Sousa, Karyna Lysenko, Rodrigo Esperanca"
 date: "17 de abril de 2023"
 output: html_document
+encoding: UTF-8
 ---
 
 ```{r setup, include=FALSE}
@@ -145,7 +146,84 @@ barplot(cbind(tabela_dead, tabela_alive), beside = TRUE, col = cores,
         legend.text = c("Female", "Male"), args.legend = list(x = "topright"))
 ```
 
+Depois de uma análise mais geral dos metadados, a abordagem seguinte passou pelo tratamento dos dados. Como referido, o nosso dataset tinha 60660 linhas (genes) e portanto era necessário uma filtragem. A nossa abordagem passou também por defenir uma condição associada aos dados, condição essa que escolhemos a partir de uma coluna dos metadados que identificava um determinado gene como mutante ou wildtype.
 
+```{r}
+library(DESeq2)
+data_de <- data_rna_LGG[,!is.na(data_rna_LGG$paper_IDH.status)] 
+ddsSE <- DESeqDataSet(data_de, design = ~ paper_IDH.status)
+```
+
+Como primeiro passo na filtragem procedemos à remoção dos dados que não tinham associação mutante ou wildtype, ou seja, eliminamos os genes associados a NA.
+Como é expectável, essa filtragem por si só não é suficiente e portanto filtramos as linhas cujo sumatório das contagens é inferior a 10 e, que tem pelo menos mais do que 3 pacientes com contagem superior a 10.
+
+```{r}
+keep <- which(rowSums(counts(ddsSE) >= 10) >= 3) 
+ddsSE_filtrado <- ddsSE[keep, ] 
+```
+
+Após estas duas etapas de filtragem conseguimos passar para um dataset com 32648 linhas(genes). Sendo este o ponto de partida para nas etapas seguintes realizar a normalização dos nossos dados associados às mesmas condições já referidas.
+
+```{r}
+ddsSE_norm <- DESeq(ddsSE_filtrado) 
+resultsNames(ddsSE_norm) 
+res <- results(ddsSE_norm, name = "paper_IDH.status_WT_vs_Mutant") 
+dea <- as.data.frame(res)
+```
+
+```{r}
+mcols(res, use.names = TRUE)
+```
+
+A primeira coluna, baseMean, é a média das contagens dos dois grupos (mutante e wildtype), ou seja, é a média da expressão do gene em todas as amostras. Essa medida é calculada a partir dos valores de contagem normalizados pelo tamanho da amostra. A coluna log2FoldChange é a diferença média na expressão do gene entre os dois grupos, em escala log2. Um valor positivo indica que o gene está mais expresso no grupo 1 (WT) em relação ao grupo 2 (Mutant), enquanto um valor negativo indica que o gene está mais expresso no grupo 2 (Mutant) em relação ao grupo 1 (WT). O valor zero indica que não há diferença na expressão entre os dois grupos. A coluna lfcSE é o erro padrão (desvio padrão) estimado do log2FoldChange. A coluna stat é o valor z-score (ou estatística do teste) usado para testar a hipótese nula de que não há diferença na expressão entre os dois grupos. Esse valor é calculado dividindo o log2FoldChange pelo lfcSE. A coluna p-value  é uma medida estatística onde hipótese nula é que os genes não possuem uma expressão diferencial e quando rejeitamos essa hipótese , ou seja , com um pvalue baixo conseguimos obter os genes diferencialmente expressos. A coluna p-adj é o valor p ajustado para correção do teste de múltiplas comparações, geralmente utilizando o método FDR (controle de taxa de falsos positivos). Esse valor é utilizado para determinar a significância estatística dos resultados.
+
+```{r}
+summary(res)
+```
+
+Pela análise dos valores de LFC podemos concluir que temos mais genes mutantes expressos,todavia a diferença não é muito. Contudo, um aspeto essencial neste tipo de análise é identificar os genes que são diferencialmente expressos. A visualização gráfica desse conjunto de genes é dada por o seguinte código, estando esse genes coloridos a azul e a cinzento temos os genes que não são diferencialmente expressos.
+
+```{r}
+plotMA(res, main="DESeq2", ylim=c(-10,10))
+```
+
+Como é possivel verificar existem muito pontos classificados como diferencialmente expressos. Assim, o objetivo seguinte seria identificar os genes que representam cada um desses pontos. Para este objetivo 2 estratégias poderiam ser realizadas:
+i) com exploração do pvalue <0.05, que permitiria rejeitar  a hipotese nula onde os genes sap igualmente expressos em ambas as condições. 
+
+```{r}
+hist(dea$pvalue, breaks=20,col = "grey", border = "white", xlab = "P-value",
+     ylab = "Number of genes", main = "P-value value distribution")
+genes_pvalue_fi <- rownames(res)[which(dea$pvalue < 0.05)]
+pvalue_fi= sum(dea$pvalue < 0.05, na.rm=TRUE)
+```
+
+Com esta nova filtragem obtivemos 23323 genes diferencialmente expressos (rejeitamos a hipótese nula) . Todavia, se assumir que a hipótese nula é verdadeira para todos os genes, é expectavel que a´te 5 % dos genes sejam diferencialmente expressos. Posto isto, 1632 genes poderiam ser escolhidos como diferencalmente expressos, o que iria equivaler a cerca de 7 % de falsos positivos face ao que foi obtido (1632/23323 *100). Assim, achamos mais apropriado a seguinte estratégia:
+ii) com a exploração de um padj<0.01, onde estamos a aceitar ter uma percentagem máxima de 1% de falsos positivos, o que irá peritir uma maior filtragem.
+
+```{r}
+hist(dea$padj, breaks=20,col = "grey", border = "white", xlab = "P-adj",
+     ylab = "Number of genes", main = "P-adj value distribution")
+genes_padj_fi <- rownames(res)[which(dea$padj < 0.01)]
+padj_fi= sum(dea$padj < 0.01, na.rm=TRUE)
+```
+
+Com esta nova filtragem obtivemos 20126 genes diferencialmente expressos.
+
+```{r}
+BiocManager::install("genefilter", force = TRUE)
+library("genefilter")
+library("pheatmap")
+
+vsd <- varianceStabilizingTransformation(ddsSE_norm, blind = FALSE)
+resOrdered <- res[order(res$padj),]
+select <- rownames(head(resOrdered,20))
+vsd.counts <- assay(vsd)[select,]
+df <- as.data.frame(colData(ddsSE_norm)[,c("paper_IDH.status")])
+
+anno <- as.data.frame(colData(vsd)[, c("paper_IDH.status", "vital_status")])
+
+pheatmap(vsd.counts, show_colnames = F, annotation_col =anno , main="20 genes com maior diferença de expressão\n entre os mutantes e não mutantes")
+```
 
 ## Including Plots
 
