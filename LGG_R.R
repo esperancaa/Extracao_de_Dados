@@ -209,3 +209,39 @@ anno <- as.data.frame(colData(vsd)[, c("paper_IDH.status", "vital_status")])
 pheatmap(vsd.counts, show_colnames = F, annotation_col =anno , main="20 genes com maior diferença de expressão\n entre os mutantes e não mutantes")
 
 
+#Entrez:
+
+a
+BiocManager::install("clusterProfiler", force = TRUE)
+library(org.Hs.eg.db)
+library(fgsea)
+library(ggplot2)
+
+get_entrez <- function(x){
+  unlist(strsplit(x, split="[.]+"))[2]
+}
+
+ann <- select(org.Hs.eg.db,keys=sapply(rownames(res), get_entrez),columns=c("ENTREZID","SYMBOL","GENENAME"))
+head(ann)
+
+all_results.annotated <- cbind(res, ann)
+all_results.annotated
+
+results.ord <- all_results.annotated[ order(-all_results.annotated[,"log2FoldChange"]), ]
+results.ord
+
+ranks <- results.ord$log2FoldChange
+ranks
+
+names(ranks) <- results.ord$ENTREZID
+pathways <- gmtPathways("C:/Users/guilh/OneDrive/Documentos/h.all.v7.4.entrez.gmt")
+fgseaRes <- fgsea(pathways, ranks)
+
+dim(fgseaRes)
+head(fgseaRes[order(padj), ])
+
+ggplot(fgseaRes, aes(reorder(pathway, NES), NES)) +
+  geom_col(aes(fill=padj<0.05)) +
+  coord_flip() +
+  labs(x="Pathway", y="Normalized Enrichment Score",
+       title="Hallmark pathways NES from GSEA")
