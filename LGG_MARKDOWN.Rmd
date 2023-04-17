@@ -10,19 +10,31 @@ encoding: UTF-8
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## IntroduÁ„o
+##Obten√ß√£o e carregamento de packages
+Esta sec√ß√£o mostra todos os packages utilizados para, a partir dos mesmos, ser mais f√°cil obter e interpretar informa√ß√£o sobre um determinado conjunto de dados.
+```{r}
 
-Gliomas de baixo grau (LGGs) s„o tumores cerebrais, de origem em cÈlulas gliais. LGG representa 30% de neoplasmas do sistema nervoso central pedi·trico [2], e em adultos a sua incidÍncia È maior aos __30 e 40 anos__. O sintoma mais comum È a convuls„o, embora dores de cabeÁa e dÈficits neurolÛgicos focais (por exemplo, vis„o, fala e audiÁ„o) tambÈm podem ser associados [1]. 
-O avanÁo da genÈtica molecular permitiu identificar alteraÁıes genÈticas mais comuns e classificar as LGGs. Em 2021, esta classificaÁ„o passou a ser uma das guidelines da OrganizaÁ„o Mundial da Sa˙de (WHO), onde s„o descritos os perfis genÈticos mutados caraterÌsticos de cada tipo e que permitem que o tratamento escolhido seja mais direccionado e eficiente [3]. O avanÁo da genÈtica molecular deveu-se muito pelo avanÁo tecnolÛgico, nomeadamente, pelo aparecimento da an·lise transcripcional automatizado e pela criaÁ„o de bases de dados mundiais de dados clÌnicos. Neste contexto, o National Cancer Institute (NCI) e o National Human Genome Research Institute (NHGRI), criaram v·rios projetos e reuniram dados associados a v·rias patologias. Um desses projetos È o TCGA-LGG que faz parte do programa The Cancer Genome Atlas (TCGA) [4]. Com isto, o objetivo deste trabalho foi recolher os dados do perfil transcripcional................
-<http://rmarkdown.rstudio.com>.
-
-## PreparaÁ„o dos dados
-Com o intuito de explorar dados relacionados com a patologia referida, em primeiro lugar, exploramos a ferramenta de an·lise TCGA Biolinks, que fornece uma interface para aceder aos dados do The Cancer Genome Atlas (TCGA), onde h· a presenÁa de um atlas completo de alteraÁıes genÛmicas de v·rios tipos de cancer incluindo LGGs.Esta ferramenta associada a outras que ir„o ser utilizadas ir· permitir a a·lise de dados de express„o genÈtica realcionads com o LGG com o intuito de entender a complexidade dos dados a ser apresentados e obter interpretaÁıes biolÛgicas relevantes. 
-A funÁ„o GDCquery() È usada para especificar as caracterÌsticas dos dados que se deseja consultar, como o tipo de dados (Gene Expression Quantification), o workflow usado para gerar os dados (STAR - Counts) e o projeto TCGA-LGG (The Cancer Genome Atlas - Lower Grade Glioma). Em seguida, a funÁ„o GDCdownload() È usada para transfereir os dados correspondentes ‡ consulta feita anteriormente.
-A funÁ„o GDCprepare() È usada parapreparar os dados do TCGA para an·lise no R. Assim a variavel data_rna_LGG contÈm os dados de express„o genÈtica resumidos por gene e por amostra, juntamente com informaÁıes de metadados sobre as amostras.
+```
 
 ```{r}
 library(TCGAbiolinks)
+library(Biobase)
+library(DESeq2)
+```
+
+## Introdu√ß√£o
+
+Gliomas de baixo grau (LGGs) s√£o tumores cerebraiscom origem em c√©lulas gliais. LGG representa 30% de neoplasmas do sistema nervoso central [2], sendo que, em adultos a sua incid√™ncia √© maior aos __30 e 40 anos__. O sintoma mais comum √© a convuls√£o, embora dores de cabe√ßa e d√©ficits neurol√≥gicos focais (por exemplo, vis√£o, fala e audi√ß√£o) tamb√©m podem ser associados [1]. 
+O avan√ßo da gen√©tica molecular permitiu identificar altera√ß√µes gen√©ticas mais comuns e classificar os LGGs. Em 2021, esta classifica√ß√£o passou a ser uma das guidelines da Organiza√ß√£o Mundial da Sa√∫de (WHO), onde s√£o descritos os perfis gen√©ticos mutados e wild-type carater√≠sticos de cada tipo e que permitem que o tratamento escolhido seja mais direccionado e eficiente [3]. 
+O avan√ßo da gen√©tica molecular deveu-se muito ao avan√ßo tecnol√≥gico, nomeadamente, pelo aparecimento da an√°lise transcripcional automatizado e pela cria√ß√£o de bases de dados mundiais de dados cl√≠nicos. Neste contexto, o National Cancer Institute (NCI) e o National Human Genome Research Institute (NHGRI), criaram v√°rios projetos e reuniram dados associados a v√°rias patologias. Um desses projetos √© o TCGA-LGG que faz parte do programa The Cancer Genome Atlas (TCGA) [4]. Com isto, o objetivo deste trabalho foi recolher os dados do perfil transcripcional e atrav√©s da interpreta√ß√£o dos dadors de express√£o gen√©tica associados √† informa√ß√£o descrita nos metadados ...... COMPLETAR
+
+
+## Obten√ß√£o dos dados
+Com o intuito de explorar dados relacionados com a patologia referida, em primeiro lugar, exploramos a ferramenta de an√°lise TCGA Biolinks, que fornece uma interface para aceder aos dados do The Cancer Genome Atlas (TCGA), onde h√° a presen√ßa de um atlas completo de altera√ß√µes gen√≥micas de v√°rios tipos de cancer incluindo LGGs.
+A fun√ß√£o GDCquery() √© usada para especificar as caracter√≠sticas dos dados que se deseja consultar, como o tipo de dados (Gene Expression Quantification), o workflow usado para gerar os dados (STAR - Counts) e o projeto TCGA-LGG (The Cancer Genome Atlas - Lower Grade Glioma). Em seguida, a fun√ß√£o GDCdownload() √© utilizada para transfereir os dados correspondentes √† consulta feita anteriormente.
+A fun√ß√£o GDCprepare() √© para preparar os dados do TCGA para an√°lise no R. Assim a variavel data_rna_LGG cont√©m os dados de express√£o gen√©tica organizaddos juntamente com informa√ß√µes de metadados.
+
+```{r}
 query_LGG <- GDCquery(project = "TCGA-LGG", 
                   data.category = "Transcriptome Profiling", 
                   data.type = "Gene Expression Quantification", 
@@ -32,7 +44,7 @@ data_rna_LGG <- GDCprepare(query_LGG, summarizedExperiment = TRUE, save = TRUE, 
 load("TCGA_LGG.rda")
 ```
 
-Uma vez que j· temos o nosso dataset È extremamente ˙til conhecermos um pouco melhor os dados que temos a trabalhar, nomeadamente, ao nÌvel de dimensıes. AlÈm disso, È importante identificar o que analisdo em cada coluna e linha.
+Uma vez que j√° temos o nosso dataset, √© extremamente √∫til conhecer um pouco melhor os dados que temos a trabalhar, nomeadamente, ao n√≠vel de dimens√µes. Al√©m disso, √© importante identificar o que e descrito em cada coluna e linha.
 
 ```{r}
 class(data_rna_LGG)
@@ -41,65 +53,78 @@ names(data_rna_LGG)
 colnames(data_rna_LGG)
 ```
 
-O dataset em quest„o tem 60660 linhas e 534 colunas, onde cada linha È um gene e coluna È cada amostra analisada, ou seja cada paciente.
-Outro aspecto importante a analisar s„o os metadados, que nos d„o informaÁıes adicionais sobre os pacientes, neste caso em particular, nomeadamente a idade, sexo, entre outros aspetos. Os metadados s„o importantes para a interpretaÁ„o correta dos dados e para permitir a reutilizaÁ„o dos dados por outros pesquisadores. Tendo isso em consideraÁ„o utilizamos, em primeiro lugar, a biblioteca Biobase que nos facilita a an·lise dos metadados. Posto isto, com auxilio da funÁ„o colData foi possÌvel extrair os metadados e ,seguimos a mesma estratÈgia, ou seja, verificar as dimensÛes dos metadados. 
+O dataset em quest√£o tem 60660 linhas e 534 colunas, onde cada linha √© um gene e  cada coluna representa cada amostra analisada, ou seja, cada paciente.
+Outro aspecto importante a analisar s√£o os metadados, que nos d√£o informa√ß√µes adicionais sobre os pacientes, neste caso em particular, nomeadamente a idade, sexo,status vital entre outros aspetos. 
+
+Os metadados s√£o importantes para a interpreta√ß√£o correta dos dados e para permitir a reutiliza√ß√£o dos dados por outros pesquisadores. Tendo isso em considera√ß√£o foi utilizado, em primeiro lugar, a biblioteca Biobase que nos facilita a an√°lise dos metadados. Posto isto, com auxilio da fun√ß√£o colData foi poss√≠vel extrair os metadados e ,seguiu-se a mesma estrat√©gia, ou seja, verificar as dimens√≥es dos metadados. 
 
 ```{r}
-library(Biobase)
 meta_LGG = colData(data_rna_LGG)
 dim(meta_LGG)
 ```
 
-Os metadados possuem  534 linhas que correspondem a cada paciente e 110 colunas que nos permitir„o mais adiante interpretar os dados da express„o genÈtica. Todavia, em R È possivel filtrar os dados e metadados. Sendo que no nosso caso queriamos diminuir o numero de colunas, associadas aos metadados, para ser mais facil definir uma estratÈgia de an·lise para o dataset escolhido. Assim, retirarmos as colunas que tinham mais de 50 "not/Not reported/Reported" e "NA", uma vez que, seria erroneo analisar este tipo de colunas.
+Os metadados possuem  534 linhas que correspondem a cada paciente/amostra e 110 colunas que nos permitir√£o mais adiante interpretar os dados da express√£o gen√©tica. Todavia, em R √© possivel filtrar os dados e metadados. 
+
+##Metadados e sua an√°lise descritiva
+No nosso caso optou-se por diminuir o n√∫mero de colunas, associadas aos metadados, para ser mais facil definir uma estrat√©gia de an√°lise para o dataset escolhido. Assim, retiramos as colunas que tinham mais de 50 "not/Not reported/Reported" e "NA", uma vez que, seria err√≥neo analisar este tipo de colunas.
 
 ```{r}
 cols_with_not_reported <- which(sapply(meta_LGG,function(x) sum(x == "not reported", na.rm = TRUE)) > 50)
 cols_with_Not_Reported <- which(sapply(meta_LGG,function(x) sum(x == "Not Reported", na.rm = TRUE)) > 50)
 cols_with_NA <- which(sapply(meta_LGG, function(x) sum(is.na(x))) > 50)
-metadata_matriz_clean <- meta_LGG[, -c(cols_with_not_reported, cols_with_Not_Reported, cols_with_NA)] #retirar as colunas que nao queremos
+metadata_matriz_clean <- meta_LGG[, -c(cols_with_not_reported, cols_with_Not_Reported, cols_with_NA)] 
 dim(metadata_matriz_clean)
 ```
 
-Conseguimos filtrar os nossos metadados de 110 colunas para 78 colunas. Claro que seria possÌvel filtrar ainda mais, contudo nesta fase inicial apenas eliminamos essas colunas. Para iniciar a an·lise a primeira abordagem foi verificar se os dados realmente iam de acordo ao que era expect·vel segundo a literatura, nomeadamente , o facto de o diagnÛstico da patologia estar diretamente associado ao Glioma.
+Ap√≥s filtragem dos metadados obteve-se 78 colunas. Claro que, seria poss√≠vel filtrar ainda mais, contudo nesta fase inicial apenas eliminamos essas colunas. Para iniciar a an√°lise a primeira abordagem foi verificar a descri√ß√£o sum√°ria dessas colunas.
+
+```{r}
+metadados_teste=as.data.frame(metadata_matriz_clean)
+summary(metadados_teste)
+```
+
+Com uma simples an√°lise √© possivel verificar que h√° diversas colunas que possuem ainda bastantes valores NAs, superior a 20. Estas colunas podiam tamb√©m, de certa forma, ser ignoradas pelo mesmo processo descrito anteriormente , com a particularidade de mudar para >20. 
+Tendo em conta a patolia em quest√£o, Glioma, decidimos verificar se os dados realmente iam de acordo ao que era expect√°vel segundo a literatura, ou seja, se apenas tinhamos presente este tipo de patologia.
 
 ```{r}
 freq_table <- table(metadata_matriz_clean$primary_diagnosis)
 pie(freq_table,
-    main = "DistribuiÁ„o de diagnÛsticos prim·rios",
+    main = "Distribui√ß√£o de diagn√≥sticos prim√°rios",
     col = rainbow(length(freq_table)),
     border = "white",
     labels = paste(names(freq_table), ": ", freq_table, sep = ""))
 ```
 
-Astroctioma, oligodendroglioma e mixed glioma s„o tipos de tumores cerebrais que surgem a partir de cÈlulas do sistema nervoso chamadas de cÈlulas da glia. Esses tumores s„o classificados como tipos de gliomas devido ‡ sua origem.Os gliomas podem ser classificados em diferentes subtipos com base nas caracterÌsticas histolÛgicas (como a aparÍncia das cÈlulas tumorais ao microscÛpio) e moleculares (como a presenÁa ou ausÍncia de mutaÁıes genÈticas especÌficas). O astroctioma, o oligodendroglioma e o mixed glioma s„o subtipos especÌficos de gliomas que apresentam diferenÁas na sua aparÍncia histolÛgica e perfil molecular.
-A distribuiÁ„o dos pacientes escolhidos em termos de gÈnero tambÈm pode ser demontrado por um gr·fico circular.
+Astroctioma, oligodendroglioma e mixed glioma s√£o tipos de tumores cerebrais que surgem a partir de c√©lulas do sistema nervoso chamadas de c√©lulas da glia. Esses tumores s√£o classificados como tipos de gliomas devido √† sua origem. 
+Os gliomas podem ser classificados em diferentes subtipos com base nas caracter√≠sticas histol√≥gicas (como a apar√™ncia das c√©lulas tumorais ao microsc√≥pio) e moleculares (como a presen√ßa ou aus√™ncia de muta√ß√µes gen√©ticas espec√≠ficas). O astroctioma, o oligodendroglioma e o mixed glioma s√£o subtipos espec√≠ficos de gliomas que apresentam diferen√ßas na sua apar√™ncia histol√≥gica e perfil molecular.
+Relativamente √† variavel gender, foi calculado as frqu√™ncias e um gr√°fico circular com base nesses valores.
 
 ```{r}
 counts <- table(metadata_matriz_clean$gender)
 colors <- c("pink", "lightblue")
-pie(counts, col = colors, main = "DistribuiÁ„o por gÈnero")
+pie(counts, col = colors, main = "Distribui√ß√£o por g√©nero")
 legend("topright", legend = names(counts), fill = colors)
 
 ```
 
-Pela observaÁ„o do gr·fico È possivel verificar que existe um maior n˙mero de pacientes do sexo masculino.Podemos ainda realizar teste estatistico como o teste do qui-quadrado para comparar a frquencia de pacientes do sexo masculino e feminino, sendo a hipÛtese nula que as frequencias observadas s„o estatisticamente semelhantes e a hipÛtese alternativo que as frquencias observadas s„o estatisticamente diferentes.
+Pela observa√ß√£o do gr√°fico √© possivel verificar que existe um maior n√∫mero de pacientes do sexo masculino.Podemos ainda realizar teste estatistico como o teste do qui-quadrado para comparar a frquencia de pacientes do sexo masculino e feminino, sendo a hip√≥tese nula que as frequencias observadas s√£o estatisticamente semelhantes e a hip√≥tese alternativo que as frquencias observadas s√£o estatisticamente diferentes.
  
 ```{r}
 chisq.test(counts)
 ```
 
-Ao analisar o resultado do p-value de 0,03 È possivel concluir que devemos rejeitar a hipÛtese nula e portanto h· diferenÁa significativa entre o numero de pacientes do sexo masculino e feminino. Todavia, a import‚ncia biolÛgica depende do contexto e do objetivo da pesquisa, sendo que nesta fase inicial apenas queremos ter uma noÁ„o mais gr·fica da distribuiÁ„o do genero dos pacientes, para mais adiante, se acharmos relevante ter isso em consideraÁ„o.
-Outro aspeto essencial quando se est· a analisar uma patologia como o cancro È a idade de diagnÛstico. Como È sabido quanto mais precoce for a deteÁ„o e respetivo tratamento de um cancro maior a probabilidade de sucesso. Posto isto e tendo em conta informaÁıes bibliogr·ficas de que o glioma aparece com mais frquencia entre os 30 e 40 anos decidimos verifcar esse aspeto no nosso data set.
+Ao analisar o resultado do p-value de 0,03 √© possivel concluir que devemos rejeitar a hip√≥tese nula e, portanto, h√° diferen√ßa significativa entre o n√∫mero de pacientes do sexo masculino e feminino. Todavia, a import√¢ncia biol√≥gica depende do contexto e do objetivo da pesquisa, sendo que nesta fase inicial, apenas queremos ter uma no√ß√£o mais gr√°fica da distribui√ß√£o do g√©nero dos pacientes, para mais adiante, se for relevante ter isso em considera√ß√£o.
+Outro aspeto essencial quando se est√° a analisar uma patologia como o cancro √© a idade de diagn√≥stico. Como √© sabido quanto mais precoce for a dete√ß√£o e respetivo tratamento de um cancro maior a probabilidade de sucesso. Posto isto, e tendo em conta informa√ß√µes bibliogr√°ficas de que o glioma aparece com maior frquencia entre os 30 e 40 anos decidimos verifcar esse aspeto no nosso dataset.
 
 ```{r}
 sem_NA=na.omit(data_rna_LGG$age_at_index)
-hist(sem_NA, breaks = seq(10, 90, 10), main = "Idades dos pacientes", xlab = "Faixa-et·ria", ylab = "FrequÍncia")
+hist(sem_NA, breaks = seq(10, 90, 10), main = "Idades dos pacientes", xlab = "Faixa-et√°ria", ylab = "Frequ√™ncia")
 summary(sem_Na)
 shapiro.test(sem_NA)
 ```
 
-… possivel verificar que a idade de diagnÛstico varia dos 14 anos ate aos 87, sendo que a faixa et·ria dos 30-40 anos tal como È referido na literatura È aquela com maior frequÍncia. Com base nos valores apresentados, poderÌamos esperar que o histograma tenha uma distribuiÁ„o assimÈtrica positiva, com uma cauda mais longa ‡ direita e uma maior concentraÁ„o de valores ‡ esquerda.  A mÈdia È de 42,71, o que significa que a idade mÈdia È ligeiramente superior ‡ mediana, o que indica que a distribuiÁ„o È ligeiramente assimÈtrica positiva. AlÈm disso pela simples observaÁ„o do gr·fico È possivel verificar que muito provavelmente a distribuiÁ„o dos dados asssocaidos ‡ idade de diagnÛstico n„o seguem uma distribuiÁ„o normal, o que tambÈm È confirmado pelo teste de shapiro obtendo um valor muito baixo do p-value e portanto rejeitando a hipotese nula de que a distribuiÁ„o seria normal.
-Tendo por base o mesmo raciocinio, ou seja, verificar se realmente ‡ uma relaÁ„o entre a idade de diagnÛstico e o facto de o paciente se encontrar vivo ou morto procedemos ‡ an·lise destes aspetos em simultaneo , tendo claro em atenÁ„o valores not reported e NA.
+√â possivel verificar que a idade de diagn√≥stico varia dos 14 aos 87 anos, sendo que a faixa et√°ria dos 30-40 anos, tal como √© referido na literatura, √© aquela com maior frequ√™ncia. Com base nos valores apresentados, poder√≠amos esperar que o histograma tenha uma distribui√ß√£o assim√©trica positiva, com uma cauda mais longa √† direita e uma maior concentra√ß√£o de valores √† esquerda.  A m√©dia √© de 42,71, o que significa que a idade m√©dia √© ligeiramente superior √† mediana, o que indica que a distribui√ß√£o √© ligeiramente assim√©trica positiva. Al√©m disso pela simples observa√ß√£o do gr√°fico √© possivel verificar que muito provavelmente a distribui√ß√£o dos dados asssocaidos √† idade de diagn√≥stico n√£o seguem uma distribui√ß√£o normal, o que tamb√©m √© confirmado pelo teste de shapiro obtendo um valor muito baixo do p-value e portanto rejeitando a hipotese nula de que a distribui√ß√£o seria normal.
+Tendo por base o mesmo raciocinio, ou seja, verificar se realmente √† uma rela√ß√£o entre a idade de diagn√≥stico e o facto de o paciente se encontrar vivo ou morto procedemos √† an√°lise destes aspetos em simultaneo , tendo claro em aten√ß√£o valores not reported e NA.
 
 ```{r}
 merged_data <- data.frame(status_vital = (metadata_matriz_clean$vital_status), 
@@ -108,19 +133,16 @@ merged_data <- na.omit(merged_data)
 index_not_reported <- which(apply(merged_data, 1, function(x) any(x == "Not Reported")))
 merged_data_clean <- subset(merged_data, !row.names(merged_data) %in% index_not_reported)
 ```
-De modo a poder observar a relaÁ„o entre a idade de diagnÛstico e o estado de vida dos pacientes optamos pela realizaÁ„o de um gr·fico de bigodes. Onde pela sua simples  interpretaÁ„o n„o parece existir uma relaÁ„o significativa entre o facto de um diagnÛstico mais recente estar associado ou n„o a um determinado estado de vida, quer seja vivo ou morto. Contudo realizamos var teste e t test para realmente verificar se diferenÁa de medias da idade de diagnostico da doenÁa de vivo ou morto eram estatistiscamente diferentes.
+
+De modo a poder observar a rela√ß√£o entre a idade de diagn√≥stico e o estado de vida dos pacientes optamos pela realiza√ß√£o de um box plot. Onde pela sua simplesinterpreta√ß√£o n√£o parece existir uma rela√ß√£o significativa entre o facto de um diagn√≥stico mais recente estar ou n√£o associado a um determinado estado vital, quer seja vivo ou morto. Contudo, realizou-se var teste e t test para realmente verificar se diferen√ßa de m√©dias da idade de diagnostico da doen√ßa de vivo ou morto eram estatistiscamente diferentes.
 
 ```{r}
 boxplot(idade_diagnostico ~ status_vital, data = merged_data_clean, 
-        main = "Idade de diagnÛstico por status vital",
-        xlab = "Status vital", ylab = "Idade de diagnÛstico")
+        main = "Idade de diagn√≥stico por status vital",
+        xlab = "Status vital", ylab = "Idade de diagn√≥stico")
 means <- tapply(merged_data_clean$idade_diagnostico, merged_data_clean$status_vital, mean)
 points(means, col = "red", pch = 18, cex = 2, lwd = 2, add = TRUE)
-var_test <- var.test(merged_data_clean$idade_diagnostico[vivos], merged_data_clean$idade_diagnostico[mortos])
-resultado_teste <- t.test(merged_data_clean$idade_diagnostico[vivos], merged_data_clean$idade_diagnostico[mortos],var.equal = FALSE)
 ```
-
-A hipÛtese nula no teste t realizado seria que as mÈdias das idade de diagnÛstico entre estado vivo ou morto seriam iguais. Todavia o pvalue foi bastante inferior a 0.05, ou seja h0 foi rejeitado, o que suger,e que h· uma diferenÁa estatisticamente significativa entre as idades de diagnÛstico dos pacientes vivos e falecidos.
 
 ```{r}
 dead_data <- subset(merged_data_clean, merged_data_clean$status_vital == "Dead") 
@@ -128,7 +150,9 @@ alive_data <- subset(merged_data_clean, merged_data_clean$status_vital == "Alive
 var_test <- var.test(alive_data$idade_diagnostico, dead_data$idade_diagnostico)  resultado_teste <- t.test(alive_data$idade_diagnostico, dead_data$idade_diagnostico,var.equal = FALSE)
 ```
 
-Em suma, È possivel concluir que de uma simples interpretaÁ„o dos metadados algumas conclsıes podem ser primariamente retiradas. De modo, a juntar a informaÁ„o relativa ao genero, idade de diagnostico e estado vital decidimos realizar um gr·fico de barras que nos permitisse observar nos dois estados vitais possiveis a frquencia de mulheres ou homens numa determinda faixa et·ria relativa ao diagnÛstico da patologia em quest„o.
+A hip√≥tese nula no teste t realizado seria que as m√©dias das idade de diagn√≥stico entre estado vivo ou morto seriam iguais. Todavia o pvalue foi bastante inferior a 0.05, ou seja h0 foi rejeitado, o que sugere que h√° uma diferen√ßa estatisticamente significativa entre as idades de diagn√≥stico dos pacientes vivos e falecidos.
+
+Em suma, √© possivel concluir que de uma simples interpreta√ß√£o dos metadados algumas concls√µes podem ser primariamente retiradas. De modo, a juntar a informa√ß√£o relativa ao genero, idade de diagnostico e estado vital decidimos realizar um gr√°fico de barras que nos permitisse observar nos dois estados vitais possiveis a frequencia de mulheres ou homens numa determinda faixa et√°ria relativa ao diagn√≥stico da patologia em quest√£o.
 
 ```{r}
 dead_data <- subset(merged_data_clean_3, merged_data_clean_3$status_vital == "Dead")
@@ -141,28 +165,31 @@ colnames(tabela_alive) <- paste("Alive", colnames(tabela_alive))
 rownames(tabela_dead) <- c("Female", "Male")
 rownames(tabela_alive) <- c("Female", "Male")
 barplot(cbind(tabela_dead, tabela_alive), beside = TRUE, col = cores,
-        main = "ComparaÁ„o entre a frquencia  de pacientes mortos e vivos em funÁ„o da faixa et·ria e tendo em atenÁ„o o genero dos mesmos",
-        xlab = "Faixa et·ria", ylab = "Contagem",
+        main = "Compara√ß√£o entre a frquencia  de pacientes mortos e vivos em fun√ß√£o da faixa et√°ria e tendo em aten√ß√£o o genero dos mesmos",
+        xlab = "Faixa et√°ria", ylab = "Contagem",
         legend.text = c("Female", "Male"), args.legend = list(x = "topright"))
 ```
 
-Depois de uma an·lise mais geral dos metadados, a abordagem seguinte passou pelo tratamento dos dados. Como referido, o nosso dataset tinha 60660 linhas (genes) e portanto era necess·rio uma filtragem. A nossa abordagem passou tambÈm por defenir uma condiÁ„o associada aos dados, condiÁ„o essa que escolhemos a partir de uma coluna dos metadados que identificava um determinado gene como mutante ou wildtype.
+INTERPRETAR O GR√ÅFICO MAS ESTOU SEM OUTPUTS
+
+##Dados e sua filtragem
+
+Depois de uma an√°lise mais geral dos metadados, a abordagem seguinte passou pelo tratamento dos dados. Como referido, o nosso dataset tinha 60660 linhas (genes) e portanto era necess√°rio uma filtragem. A abordagem passou tamb√©m por defenir uma condi√ß√£o associada aos dados, condi√ß√£o essa que escolhemos a partir de uma coluna dos metadados que identificava um determinado gene como mutante ou wildtype.
 
 ```{r}
-library(DESeq2)
 data_de <- data_rna_LGG[,!is.na(data_rna_LGG$paper_IDH.status)] 
 ddsSE <- DESeqDataSet(data_de, design = ~ paper_IDH.status)
 ```
 
-Como primeiro passo na filtragem procedemos ‡ remoÁ„o dos dados que n„o tinham associaÁ„o mutante ou wildtype, ou seja, eliminamos os genes associados a NA.
-Como È expect·vel, essa filtragem por si sÛ n„o È suficiente e portanto filtramos as linhas cujo sumatÛrio das contagens È inferior a 10 e, que tem pelo menos mais do que 3 pacientes com contagem superior a 10.
+Como primeiro passo na filtragem procedemos √† remo√ß√£o dos dados que n√£o tinham associa√ß√£o mutante ou wildtype, ou seja, eliminamos os genes associados a NA.
+Como √© expect√°vel, essa filtragem por si s√≥ n√£o √© suficiente e portanto ficamos com as as linhas cujo sumat√≥rio das contagens √© superior ou igual a 10 e, que tem pelo menos mais do que 3 pacientes com contagem superior a 10.
 
 ```{r}
 keep <- which(rowSums(counts(ddsSE) >= 10) >= 3) 
 ddsSE_filtrado <- ddsSE[keep, ] 
 ```
 
-ApÛs estas duas etapas de filtragem conseguimos passar para um dataset com 32648 linhas(genes). Sendo este o ponto de partida para nas etapas seguintes realizar a normalizaÁ„o dos nossos dados associados ‡s mesmas condiÁıes j· referidas.
+Ap√≥s estas duas etapas de filtragem conseguimos passar para um dataset com 32648 linhas(genes). Este foi o ponto de partida para nas etapas seguintes realizar a normaliza√ß√£o dos dados associados √†s mesmas condi√ß√µes j√° referidas.
 
 ```{r}
 ddsSE_norm <- DESeq(ddsSE_filtrado) 
@@ -175,20 +202,25 @@ dea <- as.data.frame(res)
 mcols(res, use.names = TRUE)
 ```
 
-A primeira coluna, baseMean, È a mÈdia das contagens dos dois grupos (mutante e wildtype), ou seja, È a mÈdia da express„o do gene em todas as amostras. Essa medida È calculada a partir dos valores de contagem normalizados pelo tamanho da amostra. A coluna log2FoldChange È a diferenÁa mÈdia na express„o do gene entre os dois grupos, em escala log2. Um valor positivo indica que o gene est· mais expresso no grupo 1 (WT) em relaÁ„o ao grupo 2 (Mutant), enquanto um valor negativo indica que o gene est· mais expresso no grupo 2 (Mutant) em relaÁ„o ao grupo 1 (WT). O valor zero indica que n„o h· diferenÁa na express„o entre os dois grupos. A coluna lfcSE È o erro padr„o (desvio padr„o) estimado do log2FoldChange. A coluna stat È o valor z-score (ou estatÌstica do teste) usado para testar a hipÛtese nula de que n„o h· diferenÁa na express„o entre os dois grupos. Esse valor È calculado dividindo o log2FoldChange pelo lfcSE. A coluna p-value  È uma medida estatÌstica onde hipÛtese nula È que os genes n„o possuem uma express„o diferencial e quando rejeitamos essa hipÛtese , ou seja , com um pvalue baixo conseguimos obter os genes diferencialmente expressos. A coluna p-adj È o valor p ajustado para correÁ„o do teste de m˙ltiplas comparaÁıes, geralmente utilizando o mÈtodo FDR (controle de taxa de falsos positivos). Esse valor È utilizado para determinar a signific‚ncia estatÌstica dos resultados.
+A primeira coluna, baseMean, √© a m√©dia das contagens dos dois grupos (mutante e wildtype), ou seja, √© a m√©dia da express√£o do gene em todas as amostras. Essa medida √© calculada a partir dos valores de contagem normalizados pelo tamanho da amostra. 
+A coluna log2FoldChange √© a diferen√ßa m√©dia na express√£o do gene entre os dois grupos, em escala log2. Um valor positivo indica que o gene est√° mais expresso no grupo 1 (WT) em rela√ß√£o ao grupo 2 (Mutant), enquanto um valor negativo indica que o gene est√° mais expresso no grupo 2 (Mutant) em rela√ß√£o ao grupo 1 (WT). O valor zero indica que n√£o h√° diferen√ßa na express√£o entre os dois grupos. 
+A coluna lfcSE √© o erro padr√£o (desvio padr√£o) estimado do log2FoldChange. 
+A coluna stat √© o valor z-score (ou estat√≠stica do teste) usado para testar a hip√≥tese nula de que n√£o h√° diferen√ßa na express√£o entre os dois grupos. Esse valor √© calculado dividindo o log2FoldChange pelo lfcSE. 
+A coluna p-value  √© uma medida estat√≠stica onde hip√≥tese nula √© que os genes n√£o possuem uma express√£o diferencial e quando rejeitamos essa hip√≥tese , ou seja , com um pvalue baixo conseguimos obter os genes diferencialmente expressos. 
+A coluna p-adj √© o valor p ajustado para corre√ß√£o do teste de m√∫ltiplas compara√ß√µes, geralmente utilizando o m√©todo FDR (controle de taxa de falsos positivos). Esse valor √© utilizado para determinar a signific√¢ncia estat√≠stica dos resultados.
 
 ```{r}
 summary(res)
 ```
 
-Pela an·lise dos valores de LFC podemos concluir que temos mais genes mutantes expressos,todavia a diferenÁa n„o È muito. Contudo, um aspeto essencial neste tipo de an·lise È identificar os genes que s„o diferencialmente expressos. A visualizaÁ„o gr·fica desse conjunto de genes È dada por o seguinte cÛdigo, estando esse genes coloridos a azul e a cinzento temos os genes que n„o s„o diferencialmente expressos.
+Pela an√°lise dos valores de LFC podemos concluir que temos mais genes mutantes expressos,todavia a diferen√ßa n√£o √© muito elevada. No entanto, um aspeto essencial neste tipo de an√°lise √© identificar os genes que s√£o diferencialmente expressos. A visualiza√ß√£o gr√°fica desse conjunto de genes √© dada por o seguinte c√≥digo, estando esse genes coloridos a azul e a cinzento os genes que n√£o s√£o diferencialmente expressos.
 
 ```{r}
 plotMA(res, main="DESeq2", ylim=c(-10,10))
 ```
 
-Como È possivel verificar existem muito pontos classificados como diferencialmente expressos. Assim, o objetivo seguinte seria identificar os genes que representam cada um desses pontos. Para este objetivo 2 estratÈgias poderiam ser realizadas:
-i) com exploraÁ„o do pvalue <0.05, que permitiria rejeitar  a hipotese nula onde os genes sap igualmente expressos em ambas as condiÁıes. 
+Como √© possivel verificar existem muito pontos classificados como diferencialmente expressos. Assim, o objetivo seguinte seria identificar os genes que representam cada um desses pontos. Para este objetivo duas estrat√©gias poderiam ser realizadas:
+i) com explora√ß√£o do pvalue <0.05, que permitiria rejeitar  a hipotese nula onde os genes s√£o igualmente expressos em ambas as condi√ß√µes. 
 
 ```{r}
 hist(dea$pvalue, breaks=20,col = "grey", border = "white", xlab = "P-value",
@@ -197,8 +229,8 @@ genes_pvalue_fi <- rownames(res)[which(dea$pvalue < 0.05)]
 pvalue_fi= sum(dea$pvalue < 0.05, na.rm=TRUE)
 ```
 
-Com esta nova filtragem obtivemos 23323 genes diferencialmente expressos (rejeitamos a hipÛtese nula) . Todavia, se assumir que a hipÛtese nula È verdadeira para todos os genes, È expectavel que a¥te 5 % dos genes sejam diferencialmente expressos. Posto isto, 1632 genes poderiam ser escolhidos como diferencalmente expressos, o que iria equivaler a cerca de 7 % de falsos positivos face ao que foi obtido (1632/23323 *100). Assim, achamos mais apropriado a seguinte estratÈgia:
-ii) com a exploraÁ„o de um padj<0.01, onde estamos a aceitar ter uma percentagem m·xima de 1% de falsos positivos, o que ir· peritir uma maior filtragem.
+Com esta nova filtragem obtivemos 23323 genes diferencialmente expressos (rejeitamos a hip√≥tese nula) . Todavia, se assumir que a hip√≥tese nula √© verdadeira para todos os genes, √© expectavel que  5 % dos genes sejam diferencialmente expressos. Posto isto, 1632 genes poderiam ser escolhidos como diferencalmente expressos, o que iria equivaler a cerca de 7 % de falsos positivos face ao que foi obtido (1632/23323 *100). Assim, achamos mais apropriado a seguinte estrat√©gia:
+ii) com a explora√ß√£o de um padj<0.01, onde estamos a aceitar ter uma percentagem m√°xima de 1% de falsos positivos, o que ir√° peritir uma maior filtragem e continua na mesma a ser uma correta abordagem.
 
 ```{r}
 hist(dea$padj, breaks=20,col = "grey", border = "white", xlab = "P-adj",
@@ -208,6 +240,8 @@ padj_fi= sum(dea$padj < 0.01, na.rm=TRUE)
 ```
 
 Com esta nova filtragem obtivemos 20126 genes diferencialmente expressos.
+
+##An√°lise da express√£o diferencial
 
 ```{r}
 BiocManager::install("genefilter", force = TRUE)
@@ -222,7 +256,7 @@ df <- as.data.frame(colData(ddsSE_norm)[,c("paper_IDH.status")])
 
 anno <- as.data.frame(colData(vsd)[, c("paper_IDH.status", "vital_status")])
 
-pheatmap(vsd.counts, show_colnames = F, annotation_col =anno , main="20 genes com maior diferenÁa de express„o\n entre os mutantes e n„o mutantes")
+pheatmap(vsd.counts, show_colnames = F, annotation_col =anno , main="20 genes com maior diferen√ßa de express√£o\n entre os mutantes e n√£o mutantes")
 ```
 
 ## Including Plots
