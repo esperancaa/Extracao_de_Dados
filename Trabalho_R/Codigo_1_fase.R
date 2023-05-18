@@ -4,11 +4,19 @@ library("TCGAbiolinks")
 library("Biobase")
 library("DESeq2")
 library("ggbeeswarm")
-library("genefilter")
 library("pheatmap")
 library("org.Hs.eg.db")
 library("fgsea")
 library("ggplot2")
+library("factoextra")
+library("limma")
+library("genefilter")
+
+
+BiocManager::install("genefilter")
+
+
+
 
 #ObtenC'C#o dos dados
 
@@ -20,9 +28,11 @@ query_LGG <- GDCquery(project = "TCGA-LGG",
 #GDCdownload(query_LGG)
 
 data_rna_LGG <- GDCprepare(query_LGG, summarizedExperiment = TRUE, save = TRUE, save.filename = "TCGA_LGG.rda")
+
 load("TCGA_LGG.rda")
 
 class(data_rna_LGG)
+
 dim(data_rna_LGG)
 names(data_rna_LGG)
 colnames(data_rna_LGG)
@@ -230,3 +240,180 @@ ggplot(fgseaRes, aes(reorder(pathway, NES), NES)) +
   coord_flip() +
   labs(x="Pathway", y="Normalized Enrichment Score",
        title="Hallmark pathways NES from GSEA")
+
+#Clustering e outros métodos não supervisionados
+
+##Redução de dimensionalidade
+
+##PCA
+
+###A reduçção de dimensionalidade pode ser uma estratégia para determiar o número de genes que representam uma certa parte da variação do modelo.
+
+data_rna_LGG_matrix <- as.matrix(assay(data_rna_LGG))
+data_rna_LGG_matrix
+
+pairs(data_rna_LGG_matrix)
+pcares = prcomp(data_rna_LGG_matrix, scale = T)
+pcares2 = princomp(scale(data_rna_LGG_matrix))
+
+summary(pcares)
+summary(pcares2)
+
+min(which(summary(pcares)$importance[3,]>0.9))
+
+###Foi realizada também uma análise de componentes principais (PCA) sobre estes dados de forma a visualizar os dados e efetuar uma redução de dimensionalidade. Os dados já se encontravam normalizados, e do PCA temos que a primeira dimensão agrega 20.7% da variabilidade da amostra, a segunda dimensão 6.9% e a terceira dimensão 3.6%, perfazendo um total de cerca de 31,2% de variabilidade cumulativa. Para perfazer mais de 90% da variabilidade total do dataset, seria necessário acumular 3 componentes.
+
+plot(pcares)
+plot(pcares2)
+
+
+biplot(pcares) #tirar conclusões disto
+
+fviz_famd_ind(pcares, geom = c("point"), col.ind = "cos2", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+              palette = "rainbow", addEllipses = FALSE, ellipse.type = "confidence",
+              ggtheme = theme_minimal(), repel = TRUE, labels = F)  
+
+### Ao observar as linhagens representadas graficamente ao longo dos primeiro e segundo componentes, temos que ao colorir as linhagens pela sua qualidade de representação “cos2” que as linhagens mais próximas do 0 são aquelas cuja variação se encontra menos explicada pelos dois componenetes representados, enquanto que aquelas mais distantes ao longo do primeiro e segundo eixo são aquelas que se encontram melhor diferenciadas.
+
+##Clustering Hierárquico
+
+tt_mdr = rowttests(t(data_rna_LGG_matrix))
+rank_de_mdr = order(tt_mdr$p.value)
+genes_de_mdr = rank_de_mdr[1:30]
+data_rna_LGG_rank = data_rna_LGG_matrix[genes_de_mdr,]
+
+eucD = dist(data_rna_LGG_rank)
+
+###complete
+cl.hier <- hclust(eucD)
+plot(cl.hier,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:complete, distância Euclidiana")
+
+###single
+cl.hier2 <- hclust(eucD, method="single")
+plot(cl.hier2,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:single, distância Euclidiana")
+
+###average
+cl.hier3 <- hclust(eucD, method="average")
+plot(cl.hier3,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:average, distância Euclidiana")
+
+heatmap(data_rna_LGG_rank, labCol = F, main="Expressão dos 30 genes com menor p-value")
+
+### Escolher um metadado para fazer comparações?? (não tenho a certeza disto)
+
+##k-means clustering
+
+### optimal number of clusters 
+fviz_nbclust(t(data_rna_LGG_matrix), kmeans, method = "silhouette")
+
+##Para efetuar o clustering por k-means, de forma a efetuar uma classificação dos grupos observados no PCA, foi primeiro realizada uma siluette analysis sobre os dados logaritmizados com recurso a função fviz_nbclust, que nos indicou que a solução ótima residia em 2 clusters.
+
+### Map of predicted clusters
+
+resKmeans <- kmeans(data_rna_LGG_matrix,centers=3)
+resKmeans
+resKmeans$cluster
+
+#não consegui fazer o gráfico dos clusters k-mean porque está a faltar um metadado
+
+#Análise supervisionada (Machine Learning)
+
+set.seed(16718)
+data_rna_LGG_data <- data.frame(data_rna_LGG_matrix)
+
+ml_mutants <- as.data.frame(cbind(group = meta_LGG$paper_IDH.status, t(data_rna_LGG_data)))
+ml_mutants_na <- na.omit(ml_mutants)
+ml_mutants_na$group = as.factor(ml_mutants_na$group)
+ml_mutants_na$group
+
+# 1= MUTANT   2= WT
+
+#Percentagem de exemplos corretamente classificados
+pecc = function(obs,pred) sum(obs==pred)/length(obs)
+
+# Raízquadradadamédiadoquadradodoserro
+rmse = function(obs, pred) sqrt(mean((obs-pred)^2)) 
+
+# Médiadosdesviosabsolutos
+mad = function(obs, pred) mean(abs(obs-pred))
+
+#Divisão em train e test em 70%, 30%
+ind = sample(2, nrow(ml_mutants_na), replace=TRUE, prob=c(0.7, 0.3)) 
+trainData = ml_mutants_na[ind==1,]
+testData = ml_mutants_na[ind==2,]
+dim(trainData)
+dim(testData)
+table(trainData$group)
+table(testData$group)
+
+### Métodos baseados em instâncias
+
+#k-Nearest Neighbors 
+
+library(class)
+knn_pred = knn(trainData[,1:4], testData[,1:4], trainData$group) 
+knn_pred
+
+# 1= MUTANT   2= WT
+t = table(knn_pred, testData$group)
+t
+
+pecc(knn_pred, testData$group) #0.7898089
+
+#Naive Bayes 
+
+library(e1071)
+
+model = naiveBayes(group ~ ., trainData[,1:4]) #não sei para que serve o [,1:4], no entanto sem isso, não corre porque são muitos dados
+nb_pred = predict(model, testData)
+nb_pred
+
+table(nb_pred, testData$group)
+
+pecc(testData$group, nb_pred) #0.8535032
+
+#Decision Trees
+
+library(party)
+ml_mutants_na_ctree <- ctree(group ~., data=trainData[,1:4])
+print(ml_mutants_na_ctree)
+
+plot(ml_mutants_na_ctree)
+
+testPred <- predict(ml_mutants_na_ctree, testData)
+testPred
+
+table(testPred, testData$group)
+
+pecc(testData$group, testPred) #0.8216561
+
+#Regression Trees
+
+library(rpart)
+arvreg = rpart(group ~., data = trainData[,1:4])
+plot(arvreg)
+text(arvreg)
+val_prev = predict(arvreg, testData)
+val_prev
+
+#não consigo fazer o que está em baixo porque a nossa variavel é qualitiativa e não quantitativa (eu acho)
+rmse(val_prev, testData$group)
+mad(val_prev, testData$group)
+
+### Modelos funcionais lineares
+
+#Regressão usando PLS
+
+library(caret)
+pls.ml_mutants_na= plsda(trainData[1:4], trainData[,5]) 
+pred.pls.ml_mutants_na = predict(pls.ml_mutants_na, testData[1:4]) 
+pecc(pred.pls.ml_mutants_na, testData$group)
+
+table(pred.pls.ml_mutants_na, testData$group)
+
+
+#Modelos não lineares
+
+
+
+
+
