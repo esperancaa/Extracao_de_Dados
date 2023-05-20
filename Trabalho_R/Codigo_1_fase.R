@@ -403,17 +403,36 @@ mad(val_prev, testData$group)
 
 #Regressão usando PLS
 
-library(caret)
-pls.ml_mutants_na= plsda(trainData[1:4], trainData[,5]) 
+#não consigo correr isto porque estou a ter problemas com o package, mas penso que esteja bem
+library(caret) 
+pls.ml_mutants_na= plsda(trainData[,1:4], trainData[,5]) 
 pred.pls.ml_mutants_na = predict(pls.ml_mutants_na, testData[1:4]) 
 pecc(pred.pls.ml_mutants_na, testData$group)
 
 table(pred.pls.ml_mutants_na, testData$group)
 
+#Análise discriminante
+
+library(MASS)
+lda.model = lda(group ~., trainData[,1:4])
+lda.model
+
+test.lda = predict(lda.model, testData) 
+test.lda$class
+
+pecc(test.lda$class, testData$group) #0.8089172
+
+#Regressão logística
+
+x <- ml_mutants_na[sample(1:nrow(ml_mutants_na)),]
+x$mutant <- x$group == "1" 
+x$group <- NULL
+model <- glm(mutant~ ., family = binomial(logit), data= x/10)
+model
 
 #Modelos não lineares
 
+x$group
 
-
-
+x$mutant
 
