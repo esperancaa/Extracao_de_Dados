@@ -1,0 +1,445 @@
+---
+title: "Glioma"
+author: "Guilherme Sousa, Karyna Lysenko, Rodrigo Esperanca"
+date: "17 de abril de 2023"
+output:
+  html_document: default
+  pdf_document: default
+encoding: "UTF-8"
+editor_options:
+  markdown:
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Obtenção e carregamento de packages
+
+Esta secção mostra todos os packages utilizados para, a partir dos mesmos, ser mais fácil obter e interpretar informação sobre um determinado conjunto de dados.
+
+```{r}
+#install.packages("TCGAbiolinks")
+#install.packages("Biobase")
+#install.packages("DESeq2")
+#install.packages("ggbeeswarm")
+#install.packages("genefilter")
+#install.packages("pheatmap")
+#install.packages("org.Hs.eg.db")
+#install.packages("fgsea")
+#install.packages("ggplot2")
+```
+
+```{r}
+library("TCGAbiolinks")
+library("Biobase")
+library("DESeq2")
+library("ggbeeswarm")
+library("genefilter")
+library("pheatmap")
+library("org.Hs.eg.db")
+library("fgsea")
+library("ggplot2")
+
+
+```
+
+## Introdução
+
+Gliomas de baixo grau (LGGs) são tumores cerebrais com origem em células gliais.
+LGG representa 30% de neoplasmas do sistema nervoso central pediátrico[2], e em adultos a sua incidência é maior aos **30 e 40 anos**.
+O sintoma mais comum é a convulsão, embora dores de cabeça e déficits neurológicos focais (por exemplo, visão, fala e audição) também possam ser associados [1].
+O avanço da genética molecular permitiu identificar alterações genéticas mais comuns e classificar os LGGs. Em 2021, esta classificação passou a ser uma das guidelines da Organização Mundial da Saúde (OMS), onde são descritos os perfis genéticos mutados e wild-type caraterísticos de cada tipo e que permitem que o tratamento escolhido seja mais direccionado e eficiente [3].
+
+O avanço da genética molecular deveu-se muito ao avanço tecnológico, nomeadamente, pelo aparecimento da análise transcripcional automatizada e pela criação de bases de dados mundiais de dados clínicos. Neste contexto, o National Cancer Institute (NCI) e o National Human Genome Research Institute (NHGRI), criaram vários projetos e reuniram dados associados a várias patologias.
+Um desses projetos é o TCGA-LGG que faz parte do programa The Cancer Genome Atlas (TCGA) [4].
+Com isto, o objetivo deste trabalho foi recolher os dados do perfil transcripcional e através da interpretação da expressão genética associados à informação descrita nos metadados e, conseguir, associar a expressão diferencial dos mesmos face a uma determinada condição ou conjunto de condições a um contexto biológico relacionado com a patologia em questão.
+
+## Obtenção dos dados
+
+Com o intuito de explorar dados relacionados com a patologia referida, em primeiro lugar, exploramos a ferramenta de análise TCGA Biolinks, que fornece uma interface para aceder aos dados do The Cancer Genome Atlas (TCGA), onde está presente um atlas completo de alterações genómicas de vários tipos de cancro, incluindo o LGG.
+A função GDCquery() é usada para especificar as características dos dados que se deseja consultar, como o tipo de dados (Gene Expression Quantification), o workflow usado para gerar os dados (STAR - Counts) e o projeto TCGA-LGG (The Cancer Genome Atlas - Lower Grade Glioma).
+Em seguida, a função GDCdownload() é utilizada para transfereir os dados correspondentes à consulta feita anteriormente.
+A função GDCprepare() serve para preparar os dados do TCGA para análise no R.
+Assim a variável data_rna_LGG contém os dados de expressão genética organizados juntamente com informações de metadados.
+
+```{r}
+query_LGG <- GDCquery(project = "TCGA-LGG", 
+                  data.category = "Transcriptome Profiling", 
+                  data.type = "Gene Expression Quantification", 
+                  workflow.type = "STAR - Counts")
+#GDCdownload(query_LGG)
+data_rna_LGG <- GDCprepare(query_LGG, summarizedExperiment = TRUE, save = TRUE, save.filename = "TCGA_LGG.rda")
+load("TCGA_LGG.rda")
+```
+
+Tendo o dataset, é extremamente útil conhecer um pouco melhor os dados a trabalhar, nomeadamente, ao nível de dimensões.
+Além disso, é importante identificar o que é descrito em cada coluna e linha.
+
+```{r}
+class(data_rna_LGG)
+dim(data_rna_LGG)
+#names(data_rna_LGG)
+#colnames(data_rna_LGG)
+```
+
+O dataset em questão tem 60660 linhas e 534 colunas, onde cada linha corresponde a um gene e cada coluna representa cada amostra analisada, ou seja, cada paciente.
+Outro aspecto importante a analisar são os metadados, que nos dão informações adicionais sobre os pacientes, neste caso em particular, são a idade, o sexo, o status vital, entre outros aspetos.
+
+Os metadados são fundamentais para a interpretação correta dos dados, permitindo também a reutilização dos dados por outros investigadores.
+Tendo isso em consideração, em primeiro lugar foi utilizada a biblioteca Biobase que facilita a análise dos metadados.
+Posto isto, com auxilio da função colData foi possível extrair os metadados, seguindo-se para a verificação das dimensões dos mesmos.
+
+```{r}
+meta_LGG = colData(data_rna_LGG)
+dim(meta_LGG)
+```
+
+Os metadados possuem 534 linhas que correspondem a cada paciente/amostra e 110 colunas que nos permitirão mais adiante interpretar os dados da expressão genética.
+Todavia, em R é possivel filtrar os dados e metadados.
+
+## Metadados e sua análise descritiva
+
+No nosso caso, optou-se por diminuír o número de colunas associadas aos metadados, para ser mais fácil definir uma estratégia de análise do dataset escolhido.
+Assim, retiramos as colunas onde havia mais de 50 elementos como: "not/Not reported/Reported" e/ou "NA", uma vez que, seria erróneo analisar este tipo de colunas.
+
+```{r}
+cols_with_not_reported <- which(sapply(meta_LGG,function(x) sum(x == "not reported", na.rm = TRUE)) > 50)
+cols_with_Not_Reported <- which(sapply(meta_LGG,function(x) sum(x == "Not Reported", na.rm = TRUE)) > 50)
+cols_with_NA <- which(sapply(meta_LGG, function(x) sum(is.na(x))) > 50)
+metadata_matriz_clean <- meta_LGG[, -c(cols_with_not_reported, cols_with_Not_Reported, cols_with_NA)] 
+dim(metadata_matriz_clean)
+```
+
+Após filtragem dos metadados obteve-se 78 colunas.
+Claro que, seria possível filtrar ainda mais, contudo nesta fase inicial, apenas eliminamos essas colunas.
+Para iniciar a análise, a primeira abordagem foi verificar a descrição sumária dessas colunas.
+
+```{r}
+metadados_teste=as.data.frame(metadata_matriz_clean)
+#summary(metadados_teste)
+```
+
+Com uma simples análise, é possivel verificar que há diversas colunas que possuem ainda bastantes valores "NA"s, superior a 20 elementos.
+Estas colunas podiam também, de certa forma, ser ignoradas pelo mesmo processo descrito anteriormente , com a particularidade de mudar para \>20.
+Tendo em conta a patologia em questão - o Glioma - decidimos verificar se os dados realmente iam de acordo ao que era expectável segundo a literatura, ou seja, se apenas tinhamos presente este tipo de patologia.
+
+```{r}
+freq_table <- table(metadata_matriz_clean$primary_diagnosis)
+pie(freq_table,
+    main = "Distribuição de diagnósticos primários",
+    col = rainbow(length(freq_table)),
+    border = "white",
+    labels = paste(names(freq_table), ": ", freq_table, sep = ""))
+```
+
+Astroctioma, oligodendroglioma e mixed glioma são tipos de tumores cerebrais que surgem a partir de células do sistema nervoso chamadas de células da glia.
+Esses tumores são classificados como tipos de gliomas devido à sua origem.
+Os gliomas podem ser classificados em diferentes subtipos com base nas características histológicas (como a aparência das células tumorais ao microscópio) e moleculares (como a presença ou ausência de mutações genéticas específicas).
+O astroctioma, o oligodendroglioma e o mixed glioma são subtipos específicos de gliomas que apresentam diferenças na sua aparência histológica e perfil molecular.
+Relativamente à variavel gender, foram calculadas as frequências e desenhado um gráfico circular com base nesses valores.
+
+```{r}
+counts <- table(metadata_matriz_clean$gender)
+colors <- c("pink", "lightblue")
+pie(counts, col = colors, main = "Distribuição por género")
+legend("topright", legend = names(counts), fill = colors)
+```
+
+Pela observação do gráfico, é possivel verificar que existe um maior número de pacientes do sexo masculino.
+Podemos ainda realizar teste estatistico como o teste do qui-quadrado para comparar a frequência de pacientes do sexo masculino e feminino, sendo a hipótese nula que as frequências observadas são estatisticamente semelhantes e a hipótese alternativa que as frequências observadas são estatisticamente diferentes.
+
+```{r}
+chisq.test(counts)
+```
+
+Ao analisar o resultado do p-value de 0,03 (que é \< α = 0.05) é possivel concluir que devemos rejeitar a hipótese nula e, portanto, há diferença significativa entre o número de pacientes do sexo masculino e feminino.
+Todavia, a importância biológica depende do contexto e do objetivo da pesquisa, sendo que nesta fase inicial, apenas queremos ter uma noção mais gráfica da distribuição do género dos pacientes, para mais adiante, se for relevante ter isso em consideração.
+Outro aspeto essencial quando se está a analisar uma patologia como o cancro é a idade de diagnóstico.
+Como é sabido, quanto mais precoce for a deteção e respetivo tratamento de um cancro maior a probabilidade de sucesso.
+Posto isto, e tendo em conta as informações bibliográficas de que o glioma aparece com maior frquencia entre os 30 e 40 anos decidimos verifcar esse aspeto no nosso dataset.
+
+```{r}
+sem_NA=na.omit(data_rna_LGG$age_at_index)
+hist(sem_NA, breaks = seq(10, 90, 10), main = "Idades dos pacientes", xlab = "Faixa-etária", ylab = "Frequência")
+summary(sem_NA)
+shapiro.test(sem_NA)
+```
+
+É possivel verificar que a idade de diagnóstico varia dos 14 aos 87 anos, sendo que a faixa etária dos 30-40 anos, tal como é referido na literatura, é aquela com maior frequência.
+Com base nos valores apresentados, poderíamos esperar que o histograma tivesse uma distribuição assimétrica positiva, com uma cauda mais longa à direita e uma maior concentração de valores à esquerda.
+A média é de 42.71, o que significa que a idade média é ligeiramente superior à mediana, indicando uma distribuição ligeiramente assimétrica positiva.
+Além disso, pela simples observação do gráfico, é possivel verificar que muito provavelmente a distribuição dos dados associados à idade de diagnóstico não seguem uma distribuição normal, o que também é confirmado pelo teste de shapiro, obtendo-se um valor muito baixo do p-value e, portanto rejeitando a hipotese nula de que a distribuição seria normal.
+Tendo por base o mesmo raciocinio, ou seja, verificar se realmente há uma relação entre a idade de diagnóstico e o facto de o paciente se encontrar vivo ou morto, procedemos à análise destes aspetos em simultâneo, tendo em atenção valores "not reported" e "NA".
+
+```{r}
+merged_data <- data.frame(status_vital = (metadata_matriz_clean$vital_status), 
+                          idade_diagnostico = (metadata_matriz_clean$age_at_index))
+merged_data <- na.omit(merged_data)
+index_not_reported <- which(apply(merged_data, 1, function(x) any(x == "Not Reported")))
+merged_data_clean <- subset(merged_data, !row.names(merged_data) %in% index_not_reported)
+```
+
+De modo a poder observar a relação entre a idade de diagnóstico e o estado de vida dos pacientes, optou-se pela realização de um boxplot.
+Onde pela sua simples interpretação não parece existir uma relação significativa entre um diagnóstico mais recente estar ou não associado a um determinado estado vital, vivo ou morto.
+Contudo, realizou-se var teste e t-test para realmente verificar se há diferença de médias da idade de diagnóstico da doença de pacientes vivos ou mortos eram estatistiscamente diferentes.
+
+```{r}
+boxplot(idade_diagnostico ~ status_vital, data = merged_data_clean, 
+        main = "Idade de diagnóstico por status vital",
+        xlab = "Status vital", ylab = "Idade de diagnóstico")
+means <- tapply(merged_data_clean$idade_diagnostico, merged_data_clean$status_vital, mean)
+points(means, col = "red", pch = 18, cex = 2, lwd = 2, add = TRUE)
+```
+
+```{r}
+dead_data <- subset(merged_data_clean, merged_data_clean$status_vital == "Dead") 
+alive_data <- subset(merged_data_clean, merged_data_clean$status_vital == "Alive")
+var_test <- var.test(alive_data$idade_diagnostico, dead_data$idade_diagnostico)  
+resultado_teste <- t.test(alive_data$idade_diagnostico, dead_data$idade_diagnostico,var.equal = FALSE)
+merged_data_3 <- data.frame(status_vital = metadata_matriz_clean$vital_status, 
+                          idade_diagnostico = metadata_matriz_clean$age_at_index,
+                          gender = metadata_matriz_clean$gender)
+merged_data_3_clean <- na.omit(merged_data_3)
+dim(merged_data_3_clean)
+index_not_reported <- which(apply(merged_data_3_clean, 1, function(x) any(x == "Not Reported")))
+merged_data_clean_3 <- subset(merged_data_3_clean, !row.names(merged_data) %in% index_not_reported)
+dim(merged_data_clean_3)
+tabela <- table(merged_data_clean_3$status_vital, merged_data_clean_3$idade_diagnostico, merged_data_clean_3$gender)
+```
+
+A hipótese nula no t-test realizado diz que as médias das idade de diagnóstico entre estado vivo ou morto são iguais.
+Todavia, o p-value foi bastante inferior a 0.05, e por isso, o H0 foi rejeitado.
+Isto sugere que há uma diferença estatisticamente significativa entre as idades de diagnóstico dos pacientes vivos e falecidos.
+
+Em suma, uma simples interpretação dos metadados permite tirar algumas conclusões.
+De modo a juntar a informação relativa ao genero, idade de diagnostico e estado vital decidimos realizar um gráfico de barras que nos permitisse observar nos dois estados vitais possiveis a frequencia de mulheres/homens numa determinda faixa etária relativa ao diagnóstico da patologia em questão.
+
+```{r}
+dead_data <- subset(merged_data_clean_3, merged_data_clean_3$status_vital == "Dead")
+alive_data <- subset(merged_data_clean_3, merged_data_clean_3$status_vital == "Alive")
+cores <- c("pink", "lightblue")
+tabela_dead <- table(dead_data$gender, cut(dead_data$idade_diagnostico, breaks = seq(10, 90, 10)))
+tabela_alive <- table(alive_data$gender, cut(alive_data$idade_diagnostico, breaks = seq(10, 90, 10)))
+colnames(tabela_dead) <- paste("Dead", colnames(tabela_dead))
+colnames(tabela_alive) <- paste("Alive", colnames(tabela_alive))
+rownames(tabela_dead) <- c("Female", "Male")
+rownames(tabela_alive) <- c("Female", "Male")
+barplot(cbind(tabela_dead, tabela_alive), beside = TRUE, col = cores,
+        main = "Comparação entre a frquencia  de pacientes mortos e vivos em função da faixa etária e tendo em atenção o genero dos mesmos",
+        xlab = "Faixa etária", ylab = "Contagem",
+        legend.text = c("Female", "Male"), args.legend = list(x = "topright"))
+```
+
+Ao observar este gráfico, de uma forma geral, é possivel confirmar que a faixa etária dos 30-40 anos é a mais frequente, o que vai de encontro ao referido na literatura. O nosso dataset, contém uma maior número de pacientes do sexo masculino e o status vital mais comum é "alive". Realçar que estas informações, de uma forma isolada, apenas ajudam a ter uma maior noção de possiveis associações e interpretações que podemos fazer a um determinado conjunto de dados e, portanto, conclusões mais precisas ao nivel do funcionamento molecular e do contexto metabólico são nesta fase ainda precoces.
+
+## Dados e sua filtragem
+
+Depois de uma análise mais geral dos metadados, a abordagem seguinte passou pelo tratamento dos dados.
+Como referido, o nosso dataset tinha 60660 linhas (genes) e portanto era necessária uma filtragem.
+A abordagem passou também por defenir uma condição associada aos dados, condição essa que escolhemos a partir de uma coluna dos metadados que identificava um determinado gene como mutante ou wild-type (WT).
+
+```{r}
+data_de <- data_rna_LGG[,!is.na(data_rna_LGG$paper_IDH.status)] 
+ddsSE <- DESeqDataSet(data_de, design = ~ paper_IDH.status)
+```
+
+Como primeiro passo na filtragem, procedemos à remoção dos dados que não tinham associação mutante ou wild-type, ou seja, eliminamos os genes associados a "NA".
+Como é expectável, essa filtragem por si só não é suficiente e portanto, ficamos com as as linhas cujo sumatório das contagens é superior ou igual a 10 e, que tem pelo menos mais do que 3 pacientes com contagem superior a 10.
+
+```{r}
+keep <- which(rowSums(counts(ddsSE) >= 10) >= 3) 
+ddsSE_filtrado <- ddsSE[keep, ] 
+```
+
+Após estas duas etapas de filtragem, conseguimos passar para um dataset com 32648 linhas (genes).
+Este foi o ponto de partida para nas etapas seguintes realizar a normalização dos dados associados às mesmas condições já referidas.
+
+```{r}
+ddsSE_norm <- DESeq(ddsSE_filtrado) 
+resultsNames(ddsSE_norm) 
+res <- results(ddsSE_norm, name = "paper_IDH.status_WT_vs_Mutant") 
+dea <- as.data.frame(res)
+```
+
+```{r}
+mcols(res, use.names = TRUE)
+```
+
+A primeira coluna, baseMean, é a média das contagens dos dois grupos (mutante e wild-type), ou seja, é a média da expressão do gene em todas as amostras.
+Essa medida é calculada a partir dos valores de contagem normalizados pelo tamanho da amostra.
+A coluna log2FoldChange corresponde à diferença média na expressão do gene entre os dois grupos, em escala log2.
+Um valor positivo indica que o gene está mais expresso no grupo 1 (WT) em relação ao grupo 2 (Mutant), enquanto um valor negativo indica que o gene está mais expresso no grupo 2 (Mutant) em relação ao grupo 1 (WT).
+O valor zero indica que não há diferença na expressão entre os dois grupos.
+A coluna lfcSE é o erro padrão (desvio padrão) estimado do log2FoldChange.
+A coluna stat é o valor z-score (ou estatística do teste) usado para testar a hipótese nula de que não há diferença na expressão entre os dois grupos.
+Esse valor é calculado dividindo o log2FoldChange pelo lfcSE.
+A coluna p-value é uma medida estatística onde hipótese nula é que os genes não possuem uma expressão diferencial e quando rejeitamos essa hipótese, ou seja , com um p-value baixo conseguimos obter os genes diferencialmente expressos.
+A coluna p-adj é o valor p ajustado para correção do teste de múltiplas comparações, geralmente utilizando o método FDR (controle de taxa de falsos positivos).
+Esse valor é utilizado para determinar a significância estatística dos resultados.
+
+```{r}
+summary(res)
+```
+
+Pela análise dos valores de LFC podemos concluir que temos mais genes mutantes expressos, todavia a diferença não é muito elevada.
+No entanto, um aspeto essencial neste tipo de análise é identificar os genes que são diferencialmente expressos.
+A visualização gráfica desse conjunto de genes é dada pelo seguinte código, sendo os genes coloridos a azul os que são diferencialmente expressos e a cinzento os genes que não são.
+
+```{r}
+plotMA(res, main="Expressão diferencial", ylim=c(-10,10))
+```
+
+Como é possivel verificar existem muito pontos classificados como diferencialmente expressos.
+Assim, o objetivo seguinte seria identificar os genes que representam cada um desses pontos.
+Para este objetivo duas estratégias poderiam ser realizadas: i) com exploração do p-value \<0.05, que permitiria rejeitar a hipotese nula onde os genes são igualmente expressos em ambas as condições.
+
+```{r}
+hist(dea$pvalue, breaks=20,col = "grey", border = "white", xlab = "P-value",
+     ylab = "Number of genes", main = "P-value value distribution")
+genes_pvalue_fi <- rownames(res)[which(dea$pvalue < 0.05)]
+pvalue_fi= sum(dea$pvalue < 0.05, na.rm=TRUE)
+```
+
+Com esta nova filtragem obtivemos 23323 genes diferencialmente expressos (rejeitamos a hipótese nula).
+Todavia, se assumir que a hipótese nula é verdadeira para todos os genes, é expectavel que 5 % dos genes sejam diferencialmente expressos.
+Posto isto, 1632 genes poderiam ser escolhidos como diferencalmente expressos, o que iria equivaler a cerca de 7 % de falsos positivos face ao que foi obtido (1632/23323 \*100).
+Assim, achamos mais apropriado a seguinte estratégia: ii) com a exploração de um padj\<0.01, onde estamos a aceitar ter uma percentagem máxima de 1% de falsos positivos, o que irá peritir uma maior filtragem e continua na mesma a ser uma correta abordagem.
+
+```{r}
+hist(dea$padj, breaks=20,col = "grey", border = "white", xlab = "P-adj",
+     ylab = "Number of genes", main = "P-adj value distribution")
+genes_padj_fi <- rownames(res)[which(dea$padj < 0.01)]
+padj_fi= sum(dea$padj < 0.01, na.rm=TRUE)
+```
+
+Com esta nova filtragem obtivemos 20126 genes diferencialmente expressos.
+
+## Análise da expressão diferencial
+
+Tendo em conta que temos 20126 genes, um numero bastante elevado mesmo após filtragem, decidimos para primeira abordagem analisar o gene mais diferencialmente expresso, ou seja, cujo valor de p-adj é menor.
+
+```{r}
+topGene <- rownames(res)[which.min(res$padj)]
+```
+
+A partir daí e, de modo, a facilitar a interpertação realizamos um gráfico que nos permite ver a dispersão das contagem associadas ao gene mais diferencialmente expresso nas duas condições mutante e wild-type.
+
+```{r}
+plotCounts(ddsSE_norm, gene = topGene, intgroup=c("paper_IDH.status"))
+```
+
+A partir do gráfico é possível observar que a maior parte das amostras de pacientes com glioma têm gene mutante e aqueles que têm o gene wild-type, por norma, têm associado valores de maior expressão.
+Esta mesma abordagem foi realizada face às mesmas condições, mutante e wild-type, mas associada também à outra condição clínica, o estado vital do paciente, que é representado com bolas de diferentes cores.
+
+```{r}
+geneCounts <- plotCounts(ddsSE_norm, gene = topGene, intgroup = c("paper_IDH.status","vital_status"), 
+                         returnData = TRUE)
+ggplot(geneCounts, aes(x = paper_IDH.status, y = count, color = vital_status)) + 
+  scale_y_log10() +  geom_beeswarm(cex = 3)
+```
+
+A interpretação deste gráfico é bastante semelhante à do anterior com a particularidade de que com a nova condição clínica adicionada é possível observar que: a maior parte das amostras associadas a genes mutantes são de pacientes que ainda se encontram vivos, ao passo que quando olhamos para as amostras associadas ao genes wild-type é possivel observar pouca diferença relativamente ao estado vital.
+O gene mais diferencialmente expresso, cujo ID é ENSG00000179299.17, é um gene que codifica a proteina metiltransferase, cuja função generalizada é adicionar grupos metilo a moléculas de RNA.
+Este gene, designado por NSUN7 tem um papel chave na regulação da expressão genética e está envolvido no processo da biogénese ribossomal.
+Mutações neste gene já foram identificadas na literatura com associação direta ao desenvolvimento de desordem neurológicas podendo estar associadado ao aparecimento de gliomas quer de baixo como de alto grau [5].
+Uma boa abordagem para analisar de uma forma mais global, e tendo na mesma em consideração a condição mutante vs wild-type, é através de um heatmap que se consegue identificar padrões ou tendências nos dados.
+Para realizar o heatmap, consideraram-se apenas os 20 genes com maior diferenciação de expressão ( 20 genes com menor p-adj).
+
+```{r}
+vsd <- varianceStabilizingTransformation(ddsSE_norm, blind = FALSE)
+resOrdered <- res[order(res$padj),]
+select <- rownames(head(resOrdered,20))
+vsd.counts <- assay(vsd)[select,]
+df <- as.data.frame(colData(ddsSE_norm)[,c("paper_IDH.status")])
+
+anno <- as.data.frame(colData(vsd)[, c("paper_IDH.status", "vital_status")])
+
+pheatmap(vsd.counts, show_colnames = F, annotation_col =anno , main="20 genes com maior diferença de expressão\n entre os mutantes e não mutantes")
+```
+
+Ao analisar o heatmap efetuado, verifica-se visualmente um predomínio de genes mutantes em relação aos genes WT.
+Contudo, os genes WT estão associados a maiores niveis de expressões, estando por isso sobreexpressos quando comparamos aos genes mutante.
+Além disso, é possível observar que o gene WT está mais associado a pacientes já falecidos, sendo o contrário para o gene mutante.
+O gene mais expresso quer em mutante como em wild-type (ENSG00000132432.14), está referido na literatura como um gene que codifica a proteína Secretogranina-1 (SCG1).
+A proteína SCG1 é produzida pelas células neuroendócrinas e é envolvida na regulação da secreção de hormonas e neurotransmissores.
+Além disso, a SCG1 pode ter um papel importante em processos de diferenciação e desenvolvimento neuronal, bem como em doenças neurodegenerativas e neurológicas.
+A expressão elevada deste gene já está descrita na literatura sendo associada a patologias como glioblastoma e glioma, sendo este gene utilizado como marcador de prognóstico relativamente a uma resposta terapeutica [6].
+
+Outro gene que queremos realçar é NSG00000125845.7, o gene BMP2 (Bone Morphogenetic Protein 2) que codifica uma proteína sinalizadora envolvida na regulação do crescimento e desenvolvimento celular em muitos tecidos, incluindo o tecido nervoso.
+No contexto do glioma, estudos sugerem que o BMP2 pode ter um papel como supressor tumoral, ou seja, que a sua ativação ou expressão reduz o crescimento e proliferação das células tumorais.
+Por outro lado, também foi relatado que o BMP2 pode ter um papel pró-tumoral em algumas situações, promovendo a migração e invasão das células tumorais [7].
+Portanto, o papel do BMP2 no glioma pode ser complexo e pode variar de acordo com o contexto celular e molecular específico.
+Quanto à mutação do gene BMP2, não há relatos de mutações frequentes ou específicas nesse gene em gliomas.
+No entanto, alterações em vias de sinalização associadas ao BMP2, têm sido implicadas na patogênese do glioma.
+
+## Enriquecimento 
+
+A análise de enriquecimento é uma técnica utilizada na análise de dados biológicos para identificar se um conjunto de genes (ou outras entidades biológicas) está enriquecido em relação a determinadas anotações biológicas, como vias metabólicas, funções biológicas, processos celulares, compartimentos celulares, entre outros.
+
+O objetivo é identificar se um conjunto de genes têm uma função biológica ou uma característica comum que sugere que eles estejam envolvidos em um determinado processo biológico ou que eles sejam regulados por um conjunto comum de fatores de transcrição, por exemplo.
+O que pretendemos é realizar uma análise dos dados de expressão genética em larga escala, na qual os conjuntos de genes diferencialmente expressos serão comparados com as anotações biológicas para identificar as funções biológicas e processos celulares afetados pelas mudanças na expressão.
+
+```{r}
+get_entrez <- function(x){
+  unlist(strsplit(x, split="[.]+"))[2]
+}
+
+ann <- select(org.Hs.eg.db,keys=sapply(rownames(res), get_entrez),columns=c("ENTREZID","SYMBOL","GENENAME"))
+head(ann)
+```
+
+```{r}
+all_results.annotated <- cbind(res, ann)
+head(all_results.annotated)
+```
+
+```{r}
+results.ord <- all_results.annotated[ order(-all_results.annotated[,"log2FoldChange"]), ]
+ranks <- results.ord$log2FoldChange
+names(ranks) <- results.ord$ENTREZID
+pathways <- gmtPathways("C:/Users/rodri/OneDrive/Documentos/h.all.v7.4.entrez.gmt")
+fgseaRes <- fgsea(pathways, ranks)
+```
+
+```{r}
+dim(fgseaRes)
+```
+
+```{r}
+head(fgseaRes[order(padj), ])
+```
+
+```{r}
+ggplot(fgseaRes, aes(reorder(pathway, NES), NES)) +
+  geom_col(aes(fill=padj<0.05)) +
+  coord_flip() +
+  labs(x="Pathway", y="Normalized Enrichment Score",
+       title="Hallmark pathways NES from GSEA")
+```
+
+Esta análise permitiu, com recurso à utilização de um dataset que identifica as diferentes pathways humanas (Hallmark), perceber as principais alterações em processos fisiológicos concretos. 
+Das diferentes pathways apresentadas apenas queremos analisar as que estão coloridas a azul, pois possuem um p-adj inferior a 0.05. Dentro dessas vias "azuis" queremos realçar a Hallmark_bilie_acid_Metabolism, uma  vez que, é aquela com um maior NES. Este ultimo aspecto, significa que os genes num conjunto específico estão mais concentrados numa determinada via ou processo biológico. Isso sugere que o conjunto de genes está enriquecido na via biológica e pode ser indicativo de uma função biológica significativa desempenhada pelos genes. 
+A via metabólica referenciada está descrita na literatura com uma associação indireta ao glioma, na medida em que, o metabolismo biliar está relacionado com o metabolismo do colesterol e este, por sua vez, está associado ao glioma [8]. Outra indireta relação é com o facto de a bílis poder em casos extremos passar a barreira hematoencefálica e a presença de certas propriedades de substâncias da bilis levarem ao aparecimento de gliomas [9].
+Em suma, o metabolismo biliar pode estar inderetamente relacionado com o glioma e achamos que como esta associação pode juntar diversas subvias e, como tal, diversos genes é credivel que a Hallmark_bilie_acid_Metabolism seja aquela com maior NES.
+
+## Bibliografia
+1. Haddad, A.F., Young, J.S., Oh, J.Y., Okada, H., Aghi, M.K.: The immunology of low-grade gliomas. Neurosurg. Focus. 52, E2 (2022). https://doi.org/10.3171/2021.11.FOCUS21587.
+
+2. Bale, T.A., Rosenblum, M.K.: The 2021 WHO Classification of Tumors of the Central Nervous System: An update on pediatric low-grade gliomas and glioneuronal tumors. Brain Pathol. 32, e13060 (2022). https://doi.org/10.1111/bpa.13060.
+
+3. Osborn, A.G., Louis, D.N., Poussaint, T.Y., Linscott, L.L., Salzman, K.L.: The 2021 World Health Organization Classification of Tumors of the Central Nervous System: What Neuroradiologists Need to Know. Am. J. Neuroradiol. 43, 928–937 (2022). https://doi.org/10.3174/ajnr.A7462.
+
+4. The Cancer Genome Atlas Program (TCGA) - NCI, https://www.cancer.gov/ccg/research/genome- sequencing/tcga, last accessed 2023/04/13
+
+5. Janin, M., Ortiz-Barahona, V., de Moura, M.C., Martínez-Cardús, A., Llinàs-Arias, P., et al: Epigenetic loss of RNA-methyltransferase NSUN5 in glioma targets ribosomes to drive a stress adaptive translational program. Acta Neuropathol. (Berl.). 138, 1053–1074 (2019). https://doi.org/10.1007/s00401-019-02062-4.
+
+6. Liu, B., Liu, J., Liao, Y., Jin, C., Zhang, Z., Zhao, J., Liu, K., Huang, H., Cao, H., Cheng, Q.: Identification of SEC61G as a Novel Prognostic Marker for Predicting Survival and Response to Therapies in Patients with Glioblastoma. Med. Sci. Monit. Int. Med. J. Exp. Clin. Res. 25, 3624 (2019). https://doi.org/10.12659/MSM.916648.
+
+7. Wang, T.-C., Luo, S.-J., Chang, S.-F.: Bone Morphogenetic Protein 7 Effect on Human Glioblastoma Cell Transmigration and Migration. Life. 11, 708 (2021). https://doi.org/10.3390/life11070708.
+
+8. Abdul Rashid, K., Ibrahim, K., Wong, J. H., &amp; Mohd Ramli, N. (2022). Lipid alterations in glioma: A systematic review. Metabolites, 12(12), 1280. https://doi.org/10.3390/metabo12121280
+
+9. Xin, J., Zheng, L. M., Sun, D. K., Li, X. F., Xu, P., &amp; Tian, L. Q. (2018). Mir‑204 functions as a tumor suppressor gene, at least partly by suppressing CYP27A1 in glioblastoma. Oncology Letters. https://doi.org/10.3892/ol.2018.8846 
+
