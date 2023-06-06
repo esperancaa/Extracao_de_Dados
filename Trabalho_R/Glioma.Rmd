@@ -424,6 +424,76 @@ Das diferentes pathways apresentadas apenas queremos analisar as que estão colo
 A via metabólica referenciada está descrita na literatura com uma associação indireta ao glioma, na medida em que, o metabolismo biliar está relacionado com o metabolismo do colesterol e este, por sua vez, está associado ao glioma [8]. Outra indireta relação é com o facto de a bílis poder em casos extremos passar a barreira hematoencefálica e a presença de certas propriedades de substâncias da bilis levarem ao aparecimento de gliomas [9].
 Em suma, o metabolismo biliar pode estar inderetamente relacionado com o glioma e achamos que como esta associação pode juntar diversas subvias e, como tal, diversos genes é credivel que a Hallmark_bilie_acid_Metabolism seja aquela com maior NES.
 
+
+# 2ª parte
+Nesta fase do trabalho pretende-se dar inicio à análise supervisionado dos dados.
+
+## Reducao da dimensionalidade
+Reducao da dimensionalidade tem como objetivo descobrir um conjunto de dados mais pequeno que o original, dados esses que não são correlacionados mas que são a causa da maior parte da variabilidade dos dados. Esta técnica é comumente feita por Análise de componentes principais (PCA), que se segue aplicada.
+
+```{r}
+data_rna_LGG_matrix <- as.matrix(assay(data_rna_LGG))
+
+pairs(data_rna_LGG_matrix)
+pcares = prcomp(data_rna_LGG_matrix, scale = T)
+pcares2 = princomp(scale(data_rna_LGG_matrix))
+
+summary(pcares)
+summary(pcares2)
+
+min(which(summary(pcares)$importance[3,]>0.9))
+```
+
+Interpretação
+
+Foi realizada também uma análise de componentes principais (PCA) sobre estes dados de forma a visualizar os dados e efetuar uma redução de dimensionalidade. Os dados já se encontravam normalizados, e do PCA temos que a primeira dimensão agrega 20.7% da variabilidade da amostra, a segunda dimensão 6.9% e a terceira dimensão 3.6%, perfazendo um total de cerca de 31,2% de variabilidade cumulativa. Para perfazer mais de 90% da variabilidade total do dataset, seria necessário acumular 3 componentes.
+
+## Clustering 
+O objetivo do clustering é agrupar dados com base na sua similaridade
+
+### Hierárquico
+Este tipo de agrupamento é feito por probabilidade de pertença, e é uma abordagem aglomerativa que usa a estratégia bottom up, ou seja, há construção de uma árvore que é feita das folhas para a raiz. Os clusters são representados pelos nós. 
+
+```{r}
+tt_mdr = rowttests(t(data_rna_LGG_matrix))
+rank_de_mdr = order(tt_mdr$p.value)
+genes_de_mdr = rank_de_mdr[1:30]
+data_rna_LGG_rank = data_rna_LGG_matrix[genes_de_mdr,]
+
+eucD = dist(data_rna_LGG_rank)
+```
+Há várias formas de calcular a distância entre clusters: single linkage, complete linkage ou average linkage. As  3 formas estão codificadas de seguida.
+
+```{r}
+###complete
+cl.hier <- hclust(eucD)
+plot(cl.hier,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:complete, distância Euclidiana")
+
+###single
+cl.hier2 <- hclust(eucD, method="single")
+plot(cl.hier2,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:single, distância Euclidiana")
+
+###average
+cl.hier3 <- hclust(eucD, method="average")
+plot(cl.hier3,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:average, distância Euclidiana")
+
+heatmap(data_rna_LGG_rank, labCol = F, main="Expressão dos 30 genes com menor p-value")
+
+```
+Alternativa é o clustering K-Means. Esta abordagem tenta agrupar os dados de forma a minimizar as distâncias entre os pontos e centróides dos clusters.
+
+Para efetuar o clustering por k-means, de forma a efetuar uma classificação dos grupos observados no PCA, foi primeiro realizada uma siluette analysis sobre os dados logaritmizados com recurso a função fviz_nbclust, que nos indicou que a solução ótima residia em 2 clusters.
+
+```{r}
+
+fviz_nbclust(t(data_rna_LGG_matrix), kmeans, method = "silhouette")
+```
+
+
+
+
+
+
 ## Bibliografia
 1. Haddad, A.F., Young, J.S., Oh, J.Y., Okada, H., Aghi, M.K.: The immunology of low-grade gliomas. Neurosurg. Focus. 52, E2 (2022). https://doi.org/10.3171/2021.11.FOCUS21587.
 

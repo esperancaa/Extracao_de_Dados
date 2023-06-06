@@ -1,5 +1,14 @@
 #Packages usados:
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
 
+BiocManager::install("genefilter")
+BiocManager::install("fgsea")
+BiocManager::install("limma")
+BiocManager::install("factoextra")
+install.packages("xfun")
+
+library("DESeq2")
 library("TCGAbiolinks")
 library("Biobase")
 library("DESeq2")
@@ -12,8 +21,6 @@ library("factoextra")
 library("limma")
 library("genefilter")
 
-
-BiocManager::install("genefilter")
 
 
 
@@ -227,7 +234,8 @@ ranks <- results.ord$log2FoldChange
 
 names(ranks) <- results.ord$ENTREZID
 
-pathways <- gmtPathways("C:/Users/rodri/OneDrive/Documentos/h.all.v7.4.entrez.gmt")
+##pathways <- gmtPathways("C:/Users/rodri/OneDrive/Documentos/h.all.v7.4.entrez.gmt")
+pathways <- gmtPathways("C:/Users/Karyna/Desktop/Github/Extracao_de_Dados/Trabalho_R/h.all.v7.4.entrez.gmt")
 
 fgseaRes <- fgsea(pathways, ranks)
 
@@ -283,7 +291,7 @@ genes_de_mdr = rank_de_mdr[1:30]
 data_rna_LGG_rank = data_rna_LGG_matrix[genes_de_mdr,]
 
 eucD = dist(data_rna_LGG_rank)
-
+eucD
 ###complete
 cl.hier <- hclust(eucD)
 plot(cl.hier,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:complete, distância Euclidiana")
@@ -303,6 +311,9 @@ heatmap(data_rna_LGG_rank, labCol = F, main="Expressão dos 30 genes com menor p
 ##k-means clustering
 
 ### optimal number of clusters 
+install.packages("factoextra")
+library("factoextra")
+
 fviz_nbclust(t(data_rna_LGG_matrix), kmeans, method = "silhouette")
 
 ##Para efetuar o clustering por k-means, de forma a efetuar uma classificação dos grupos observados no PCA, foi primeiro realizada uma siluette analysis sobre os dados logaritmizados com recurso a função fviz_nbclust, que nos indicou que a solução ótima residia em 2 clusters.
