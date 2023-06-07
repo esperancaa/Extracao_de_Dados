@@ -1,12 +1,13 @@
 #Packages usados:
 if (!require("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
-
+BiocManager::install("TCGAbiolinks")
 BiocManager::install("genefilter")
 BiocManager::install("fgsea")
 BiocManager::install("limma")
 BiocManager::install("factoextra")
 install.packages("xfun")
+install.packages("SummarizedExperiment") 
 
 library("DESeq2")
 library("TCGAbiolinks")
@@ -20,7 +21,7 @@ library("ggplot2")
 library("factoextra")
 library("limma")
 library("genefilter")
-
+library("SummarizedExperiment")
 
 
 
@@ -43,10 +44,12 @@ class(data_rna_LGG)
 dim(data_rna_LGG)
 names(data_rna_LGG)
 colnames(data_rna_LGG)
-
-
+str(data_rna_LGG,give.attr=FALSE)
+summary(data_rna_LGG)
 meta_LGG = colData(data_rna_LGG)
 dim(meta_LGG)
+colnames(meta_LGG)
+
 
 
 #Metadados e sua anC!lise descritiva
@@ -153,23 +156,30 @@ barplot(cbind(tabela_dead, tabela_alive), beside = TRUE, col = cores,
 
 
 #Dados e sua filtragem
+sum(is.na(data_rna_LGG))
+teste_h <- DESeqDataSetFromMatrix(countData = assay(data_rna_LGG), colData = colData(data_rna_LGG), design = ~ 1)
+teste_h <- DESeq(teste_h)
+res_t <- results(teste_h)
+summary(res_t)
+normalized_counts <- counts(teste_h)
+mean_value <- mean(normalized_counts[1, ])
+normali
 
-data_de <- data_rna_LGG[,!is.na(data_rna_LGG$paper_IDH.status)] 
+data_de <- data_rna_LGG[,!is.na(data_rna_LGG$paper_IDH.status)] #filtragem das amostras
 
 ddsSE <- DESeqDataSet(data_de, design = ~ paper_IDH.status)
 
-keep <- which(rowSums(counts(ddsSE) >= 10) >= 3) 
+keep <- which(rowSums(counts(ddsSE) >= 10) >= 3) #filtragem tendo em conta uma contagem minima
 
 ddsSE_filtrado <- ddsSE[keep, ] 
 
-ddsSE_norm <- DESeq(ddsSE_filtrado) 
 
+ddsSE_norm <- DESeq(ddsSE_filtrado)
 resultsNames(ddsSE_norm)
-
 res <- results(ddsSE_norm, name = "paper_IDH.status_WT_vs_Mutant") 
-
 dea <- as.data.frame(res)
-
+summary(dea)
+desvio_padrao <- apply(dea, 1, sd)
 mcols(res, use.names = TRUE)
 
 summary(res)
@@ -235,7 +245,8 @@ ranks <- results.ord$log2FoldChange
 names(ranks) <- results.ord$ENTREZID
 
 ##pathways <- gmtPathways("C:/Users/rodri/OneDrive/Documentos/h.all.v7.4.entrez.gmt")
-pathways <- gmtPathways("C:/Users/Karyna/Desktop/Github/Extracao_de_Dados/Trabalho_R/h.all.v7.4.entrez.gmt")
+###pathways <- gmtPathways("C:/Users/Karyna/Desktop/Github/Extracao_de_Dados/Trabalho_R/h.all.v7.4.entrez.gmt")
+pathways <- gmtPathways("C:/Users/guilh/OneDrive/Documentos/GitHub/Extracao_de_Dados/Trabalho_R/h.all.v7.4.entrez.gmt")
 
 fgseaRes <- fgsea(pathways, ranks)
 
@@ -244,7 +255,7 @@ dim(fgseaRes)
 head(fgseaRes[order(padj), ])
 
 ggplot(fgseaRes, aes(reorder(pathway, NES), NES)) +
-  geom_col(aes(fill=padj<0.01)) +
+  geom_col(aes(fill=padj<0.05)) +
   coord_flip() +
   labs(x="Pathway", y="Normalized Enrichment Score",
        title="Hallmark pathways NES from GSEA")
@@ -256,26 +267,49 @@ ggplot(fgseaRes, aes(reorder(pathway, NES), NES)) +
 ##PCA
 
 ###A reduçção de dimensionalidade pode ser uma estratégia para determiar o número de genes que representam uma certa parte da variação do modelo.
+dim (ddsSE_norm)
+data_rna_LGG_matrix <- as.matrix(assay(ddsSE_norm))
 
-data_rna_LGG_matrix <- as.matrix(assay(data_rna_LGG))
-data_rna_LGG_matrix
+# Transpor a matriz
+data_rna_LGG_transposed <- t(data_rna_LGG_matrix)
+dim(data_rna_LGG_transposed)
+# Realizar o PCA
+pcares <- prcomp(data_rna_LGG_transposed, scale. = TRUE)
 
-pairs(data_rna_LGG_matrix)
-pcares = prcomp(data_rna_LGG_matrix, scale = T)
-pcares2 = princomp(scale(data_rna_LGG_matrix))
+# Verificar os desvios padrão dos componentes principais
+loadings=pcares$rotation
 
+# Resumo estatístico dos componentes principais
 summary(pcares)
-summary(pcares2)
 
-min(which(summary(pcares)$importance[3,]>0.9))
+# Gráfico da variância explicada pelo PCA
+screeplot(pcares, type = "lines", main = "Variância-pcares")
+plot(1:length(pcares$sdev), pcares$sdev^2, type = "line", xlab = "Componentes Principais", ylab = "Variância", main = "Variância-pcares")
+
+# Adicionar legendas nos eixos
+xlab("Componentes Principais")
+ylab("Variância Explicada (%)")
+
+min(which(summary(pcares)$importance[3,]>0.90))
+var_total <- sum(pcares$sdev^2)
+soma_variancias <- sum(head(pcares$sdev^2, 100))
+
+cumulative_variance <- cumsum(variance)
+ summary(pcares$rotation[,1:258])
 
 ###Foi realizada também uma análise de componentes principais (PCA) sobre estes dados de forma a visualizar os dados e efetuar uma redução de dimensionalidade. Os dados já se encontravam normalizados, e do PCA temos que a primeira dimensão agrega 20.7% da variabilidade da amostra, a segunda dimensão 6.9% e a terceira dimensão 3.6%, perfazendo um total de cerca de 31,2% de variabilidade cumulativa. Para perfazer mais de 90% da variabilidade total do dataset, seria necessário acumular 3 componentes.
-
+plot(pcares$x, col = ddsSE_norm$paper_IDH.status, pch = 19)
+legend("topright",legend=levels(ddsSE_norm$paper_IDH.status), col = 1:2, pch=19)
 plot(pcares)
 plot(pcares2)
 
+library(scatterplot3d)
+factor <- as.factor(ddsSE_norm$paper_IDH.status)
 
-biplot(pcares) #tirar conclusões disto
+scatterplot3d(pcares$x[, 1], pcares$x[, 2], pcares$x[, 3], color = levels(factor),
+              pch = 19, xlab = "PC1", ylab = "PC2", zlab = "PC3")
+install.packages("factoextra")
+library("factoextra")
 
 fviz_famd_ind(pcares, geom = c("point"), col.ind = "cos2", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
               palette = "rainbow", addEllipses = FALSE, ellipse.type = "confidence",
