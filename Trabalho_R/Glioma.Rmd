@@ -485,7 +485,22 @@ Pela interpretação do gráfico de dispersão, podemos observar que a maior par
 
 Para completar esta secção poderia ser útil identificar quais variaveis (genes) estão mais fortemente associados a cada PC. Os valores maiores, em módulo, indicam uma maior influência dessas variaveis , sendo que um valor positivo ou negativo tem uma influencia positiva ou negativa,respetivamente.
 
-## Clustering 
+## 2. t-SNE
+
+Este algortitmo de redução de dimensionalidade tem o propósito de mapear pontos de alta dimensionalidade para um espaço de menor dimensionalidade preservando as relações de similiariedade entre pontos. Ou seja, os pontos mais semelhantes (por exemplo com expressão genética semelhante) estariam mais próximos uns dos outros e pontos mais diferentes seriam mapeados mais distantes.
+
+```{r}
+data_rna_LGG_matrix <- as.matrix(assay(ddsSE_norm))
+Rtsne(data_rna_LGG_matrix)
+data_rna_LGG_matrix_nd = data_rna_LGG_matrix[!duplicated(data_rna_LGG_matrix),]
+dim(data_rna_LGG_matrix_nd)
+res_tnse = Rtsne(data_rna_LGG_matrix_nd)
+plot(res_tnse$Y, col = ddsSE_norm$paper_IDH.status, pch = 19)
+```
+
+Todavia, pelo gráfico obtido é possivel concluir que este algoritmo para as dimensoes analisadas não é suficiente, ou seja, em termos de redução da dimensionalidade dos dados não é deveras suficiente apenas utilizar esta abordagem.Poderia existir uma justificação para esta sobreposição nomeadamente o facto de os dados seerem naturalmente "inseparaveis" numa análise num espaço de menor dimensão e, como tal , esta dimensionalidade reduzida não ser suficiente para capturar toda a estrutura complexa dos dados.
+
+## 2. Clustering 
 O objetivo do clustering é agrupar dados com base na sua similaridade
 
 ### Hierárquico

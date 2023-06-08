@@ -314,14 +314,69 @@ library("factoextra")
 fviz_famd_ind(pcares, geom = c("point"), col.ind = "cos2", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
               palette = "rainbow", addEllipses = FALSE, ellipse.type = "confidence",
               ggtheme = theme_minimal(), repel = TRUE, labels = F)  
+#tsne
+install.packages("Rtsne")
+library(Rtsne)
+
+data_rna_LGG_matrix <- as.matrix(assay(ddsSE_norm))
+data_rna_LGG_transposed <- t(data_rna_LGG_matrix)
+Rtsne(data_rna_LGG_transposed)
+data_rna_LGG_matrix_nd = data_rna_LGG_transposed[!duplicated(data_rna_LGG_transposed),]
+dim(data_rna_LGG_matrix_nd)
+res_tnse = Rtsne(data_rna_LGG_matrix_nd)
+plot(res_tnse$Y, col = ddsSE_norm$paper_IDH.status, pch = 19)
+install.packages("rgl")
+
+#mds
+data_rna_LGG_matrix <- as.matrix(assay(ddsSE_norm))
+
+# Cálculo da matriz de distâncias euclidianas
+dist_matrix <- dist(scale(data_rna_LGG_matrix))
+
+# Aplicação do MDS
+mds_result <- cmdscale(dist_matrix, k = 3, eig = TRUE)
+
+# Cálculo da variância explicada por cada coordenada
+var_pc1 <- sum(mds_result$eig[1]) / sum(abs(mds_result$eig)) * 100
+var_pc2 <- sum(mds_result$eig[2]) / sum(abs(mds_result$eig)) * 100
+var_pc3 <- sum(mds_result$eig[3]) / sum(abs(mds_result$eig)) * 100
+
+# Legendas para os eixos
+lab_pc1 <- paste("Coordinate 1 (var.", sprintf("%.3f", var_pc1), "%)")
+lab_pc2 <- paste("Coordinate 2 (var.", sprintf("%.3f", var_pc2), "%)")
+
+# Plotar o resultado do MDS
+plot(mds_result$points[, c(1, 2)], xlab = lab_pc1, ylab = lab_pc2, main = "MDS Plot")
 
 ### Ao observar as linhagens representadas graficamente ao longo dos primeiro e segundo componentes, temos que ao colorir as linhagens pela sua qualidade de representação “cos2” que as linhagens mais próximas do 0 são aquelas cuja variação se encontra menos explicada pelos dois componenetes representados, enquanto que aquelas mais distantes ao longo do primeiro e segundo eixo são aquelas que se encontram melhor diferenciadas.
 
 ##Clustering Hierárquico
-
+#por paciente##################################################
 tt_mdr = rowttests(t(data_rna_LGG_matrix))
 rank_de_mdr = order(tt_mdr$p.value)
 genes_de_mdr = rank_de_mdr[1:30]
+data_rna_LGG_rank = data_rna_LGG_transposed[genes_de_mdr,]
+
+eucD = dist(data_rna_LGG_rank)
+eucD
+###complete
+cl.hier <- hclust(eucD)
+plot(cl.hier,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:complete, distância Euclidiana")
+
+###single
+cl.hier2 <- hclust(eucD, method="single")
+plot(cl.hier2,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:single, distância Euclidiana")
+
+###average
+cl.hier3 <- hclust(eucD, method="average")
+plot(cl.hier3,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:average, distância Euclidiana")
+
+heatmap(data_rna_LGG_rank, labCol = F, main="Expressão dos 30 pacientes com menor p-value")
+
+#por genes##################################################
+tt_mdr_g = rowttests(data_rna_LGG_matrix)
+rank_de_mdr_g = order(tt_mdr_g$p.value)
+genes_de_mdr_g = rank_de_mdr_g[1:30]
 data_rna_LGG_rank = data_rna_LGG_matrix[genes_de_mdr,]
 
 eucD = dist(data_rna_LGG_rank)
