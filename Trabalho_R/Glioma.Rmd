@@ -14,7 +14,7 @@ editor_options:
     wrap: sentence
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, warning = FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -24,7 +24,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Esta secção mostra todos os packages utilizados para, a partir dos mesmos, ser mais fácil obter e interpretar informação sobre um determinado conjunto de dados.
 
-```{r,message=FALSE}
+```{r, results='hide'}
 #install.packages("TCGAbiolinks")
 #install.packages("Biobase")
 #install.packages("DESeq2")
@@ -37,17 +37,21 @@ Esta secção mostra todos os packages utilizados para, a partir dos mesmos, ser
 ```
 
 ```{r,message=FALSE}
+library("DESeq2")
 library("TCGAbiolinks")
 library("Biobase")
 library("DESeq2")
 library("ggbeeswarm")
-library("genefilter")
 library("pheatmap")
 library("org.Hs.eg.db")
 library("fgsea")
 library("ggplot2")
-
-
+library("factoextra")
+library("limma")
+library("genefilter")
+library("SummarizedExperiment")
+library("factoextra")
+library("Rtsne")
 ```
 
 ## 2. Introdução
@@ -82,7 +86,7 @@ load("TCGA_LGG.rda")
 Tendo o dataset, é extremamente útil numa primeira abordagem conhecer um pouco melhor os dados a trabalhar, nomeadamente, ao nível de dimensões.
 Além disso, é importante identificar o que é descrito em cada coluna e linha.
 
-```{r,message=FALSE}
+```{r}
 class(data_rna_LGG)
 dim(data_rna_LGG)
 #names(data_rna_LGG)
@@ -112,7 +116,7 @@ Os metadados possuem 534 linhas que correspondem a cada paciente/amostra e 110 c
 A primeira abordagem passou pela diminuíção do número de colunas associadas aos metadados, com o intuito de fazer uma filtragem dos mesmos para ser mais fácil definir uma estratégia de análise do dataset escolhido.
 Assim, retiramos as colunas dos metadados onde havia mais de 50 elementos como: "not/Not reported/Reported" e/ou "NA", uma vez que, seria erróneo analisar este tipo de colunas.
 
-```{r,message=FALSE}
+```{r}
 cols_with_not_reported <- which(sapply(meta_LGG,function(x) sum(x == "not reported", na.rm = TRUE)) > 50)
 cols_with_Not_Reported <- which(sapply(meta_LGG,function(x) sum(x == "Not Reported", na.rm = TRUE)) > 50)
 cols_with_NA <- which(sapply(meta_LGG, function(x) sum(is.na(x))) > 50)
@@ -131,11 +135,13 @@ summary(metadados_teste)
 Com uma simples análise, é possivel verificar que há diversas colunas que possuem ainda bastantes valores "NA"s, superior a 20 elementos.
 Estas colunas podiam também, de certa forma, ser ignoradas pelo mesmo processo descrito anteriormente , com a particularidade de mudar para \>20.
 
-### 4.2 Análise descritiva
+### 4.2 Análise descritiva {.tabset}
 
 De modo a explorar a patologia em questão - o Glioma - decidimos verificar/comprovar se os dados realmente iam de acordo ao que era expectável segundo a literatura, ou seja, se apenas tinhamos presente este tipo de patologia.
 
-```{r,message=FALSE}
+#### Distribuição de diagnósticos primários
+
+```{r}
 freq_table <- table(metadata_matriz_clean$primary_diagnosis)
 pie(freq_table,
     main = "Distribuição de diagnósticos primários",
@@ -148,6 +154,7 @@ Astroctioma, oligodendroglioma e mixed glioma são tipos de tumores cerebrais qu
 Os gliomas podem ser classificados em diferentes subtipos com base nas características histológicas (como a aparência das células tumorais ao microscópio) e moleculares (como a presença ou ausência de mutações genéticas específicas).
 O astroctioma, o oligodendroglioma e o mixed glioma são subtipos específicos de gliomas que apresentam diferenças na sua aparência histológica e perfil molecular.
 
+#### Distribuição por género
 Relativamente à variavel do metadado gender, foram calculadas as frequências e desenhado um gráfico circular com base nesses valores.
 
 ```{r,message=FALSE}
@@ -160,28 +167,30 @@ legend("topright", legend = names(counts), fill = colors)
 Pela observação do gráfico, é possivel verificar que existe um maior número de pacientes do sexo masculino.
 Podemos ainda realizar teste estatistico como o teste do qui-quadrado para comparar a frequência de pacientes do sexo masculino e feminino, sendo a hipótese nula que as frequências observadas são estatisticamente semelhantes e a hipótese alternativa que as frequências observadas são estatisticamente diferentes.
 
-```{r,message=FALSE}
+```{r}
 chisq.test(counts)
 ```
 
 Ao analisar o resultado do p-value de 0,03 (que é \< α = 0.05) é possivel concluir que devemos rejeitar a hipótese nula e, portanto, há diferença significativa entre o número de pacientes do sexo masculino e feminino.
 Todavia, a importância biológica depende do contexto e do objetivo da pesquisa, sendo que nesta fase inicial, apenas queremos ter uma noção mais gráfica da distribuição do género dos pacientes, para mais adiante, se for relevante ter isso em consideração.
 
-Outro aspeto essencial quando se está a analisar uma patologia como o cancro é a idade de diagnóstico.Como é sabido, quanto mais precoce for a deteção e respetivo tratamento de um cancro maior a probabilidade de sucesso.Posto isto, e tendo em conta as informações bibliográficas de que o glioma aparece com maior frquencia entre os 30 e 40 anos decidimos verifcar esse aspeto no nosso dataset.
+#### Idade dos pacientes
+Outro aspeto essencial quando se está a analisar uma patologia como o cancro é a idade de diagnóstico. Como é sabido, quanto mais precoce for a deteção e respetivo tratamento de um cancro maior a probabilidade de sucesso.Posto isto, e tendo em conta as informações bibliográficas de que o glioma aparece com maior frquencia entre os 30 e 40 anos decidimos verifcar esse aspeto no nosso dataset.
 
-```{r,message=FALSE}
+```{r}
 sem_NA=na.omit(data_rna_LGG$age_at_index)
 hist(sem_NA, breaks = seq(10, 90, 10), main = "Idades dos pacientes", xlab = "Faixa-etária", ylab = "Frequência")
 summary(sem_NA)
 shapiro.test(sem_NA)
 ```
 
-É possivel verificar que a idade de diagnóstico varia dos 14 aos 87 anos, sendo que a faixa etária dos 30-40 anos, tal como é referido na literatura, é aquela com maior frequência.
+É possivel verificar que a idade dos pacientes varia dos 14 aos 87 anos, sendo que a faixa etária dos 30-40 anos, tal como é referido na literatura, é aquela com maior frequência.
 Com base nos valores apresentados, poderíamos esperar que o histograma tivesse uma distribuição assimétrica positiva, com uma cauda mais longa à direita e uma maior concentração de valores à esquerda.
 A média é de 42.71, o que significa que a idade média é ligeiramente superior à mediana, indicando  também uma distribuição ligeiramente assimétrica positiva.
 Além disso, pela simples observação do gráfico, é possivel verificar que muito provavelmente a distribuição dos dados associados à idade de diagnóstico não seguem uma distribuição normal, o que também é confirmado pelo teste de shapiro, obtendo-se um valor muito baixo do p-value e, portanto rejeitando a hipotese nula de que a distribuição seria normal.
 
-Tendo por base o mesmo raciocinio, ou seja, verificar se realmente há uma relação entre a idade de diagnóstico e o facto de o paciente se encontrar vivo ou morto, procedemos à análise destes aspetos em simultâneo, tendo em atenção valores "not reported" e "NA".
+#### Idade aquando dignóstico e estado vital
+Tendo por base o mesmo raciocinio, ou seja, verificar se realmente há uma relação entre a idade dos pacientes quando foram diagnósticados e o facto de o paciente se encontrar vivo ou morto, procedemos à análise destes aspetos em simultâneo, tendo em atenção valores "not reported" e "NA".
 
 ```{r,message=FALSE}
 merged_data <- data.frame(status_vital = (metadata_matriz_clean$vital_status), 
@@ -203,7 +212,7 @@ means <- tapply(merged_data_clean$idade_diagnostico, merged_data_clean$status_vi
 points(means, col = "red", pch = 18, cex = 2, lwd = 2, add = TRUE)
 ```
 
-```{r,message=FALSE}
+```{r}
 dead_data <- subset(merged_data_clean, merged_data_clean$status_vital == "Dead") 
 alive_data <- subset(merged_data_clean, merged_data_clean$status_vital == "Alive")
 var_test <- var.test(alive_data$idade_diagnostico, dead_data$idade_diagnostico)  
@@ -226,7 +235,7 @@ Isto sugere que há uma diferença estatisticamente significativa entre as idade
 Em suma, uma simples interpretação dos metadados permite tirar algumas conclusões.
 De modo a juntar a informação relativa ao genero, idade de diagnostico e estado vital decidimos realizar um gráfico de barras que nos permitisse observar nos dois estados vitais possiveis a frequencia de mulheres/homens numa determinda faixa etária relativa ao diagnóstico da patologia em questão.
 
-```{r,message=FALSEr}
+```{r,message=FALSE}
 dead_data <- subset(merged_data_clean_3, merged_data_clean_3$status_vital == "Dead")
 alive_data <- subset(merged_data_clean_3, merged_data_clean_3$status_vital == "Alive")
 cores <- c("pink", "lightblue")
@@ -237,7 +246,7 @@ colnames(tabela_alive) <- paste("Alive", colnames(tabela_alive))
 rownames(tabela_dead) <- c("Female", "Male")
 rownames(tabela_alive) <- c("Female", "Male")
 barplot(cbind(tabela_dead, tabela_alive), beside = TRUE, col = cores,
-        main = "Comparação entre a frquencia  de pacientes mortos e vivos em função da faixa etária e tendo em atenção o genero dos mesmos",
+        main = "Frequência de pacientes mortos e vivos vs. a faixa etária vs. genero",
         xlab = "Faixa etária", ylab = "Contagem",
         legend.text = c("Female", "Male"), args.legend = list(x = "topright"))
 ```
@@ -259,15 +268,16 @@ ddsSE <- DESeqDataSet(data_de, design = ~ paper_IDH.status)
 A primeira filtragem foi direcionada ao número total de amostras,sendo que procedemos à remoção das mesmas que não tinham associação mutante ou wild-type, ou seja, eliminamos as amostras cuja associação ao metadado escolhido seria "NA".
 Como é expectável, essa filtragem por si só não é suficiente e portanto,optamos por realizar uma filtragem por expressão ausente e por mínima expresssão. Assim, apenas consideramos  as linhas que não têm nenhum indicador NA e cujo sumatório das contagens é superior ou igual a 10 e, que tem pelo menos mais do que 3 pacientes/amostras com contagem superior a 10, respetivamente.
 
-```{r,message=FALSE}
+```{r}
 sum(is.na(data_rna_LGG))
 ```
 
 Como não existe "NA" a filtragem por expressão ausente não foi realizada.
 
-```{r,message=FALSE}
+```{r}
 keep <- which(rowSums(counts(ddsSE) >= 10) >= 3) 
 ddsSE_filtrado <- ddsSE[keep, ] 
+dim(ddsSE_filtrado)
 ```
 
 Após estas etapas de filtragem, conseguimos passar para um dataset com 32648 linhas (genes) e 513 colunas (amostras/pacientes).
@@ -280,7 +290,7 @@ res <- results(ddsSE_norm, name = "paper_IDH.status_WT_vs_Mutant")
 dea <- as.data.frame(res)
 ```
 
-```{r,message=FALSE}
+```{r}
 mcols(res, use.names = TRUE)
 ```
 
@@ -296,7 +306,7 @@ A coluna p-value é uma medida estatística onde hipótese nula é que os genes 
 A coluna p-adj é o valor p ajustado para correção do teste de múltiplas comparações, geralmente utilizando o método FDR (controle de taxa de falsos positivos).
 Esse valor é utilizado para determinar a significância estatística dos resultados.
 
-```{r,message=FALSE}
+```{r}
 summary(res)
 ```
 
@@ -405,6 +415,8 @@ get_entrez <- function(x){
 }
 
 ann <- select(org.Hs.eg.db,keys=sapply(rownames(res), get_entrez),columns=c("ENTREZID","SYMBOL","GENENAME"))
+```
+```{r}
 head(ann)
 ```
 
@@ -417,15 +429,17 @@ head(all_results.annotated)
 results.ord <- all_results.annotated[ order(-all_results.annotated[,"log2FoldChange"]), ]
 ranks <- results.ord$log2FoldChange
 names(ranks) <- results.ord$ENTREZID
-pathways <- gmtPathways("C:/Users/rodri/OneDrive/Documentos/h.all.v7.4.entrez.gmt")
+# <- gmtPathways("C:/Users/rodri/OneDrive/Documentos/h.all.v7.4.entrez.gmt")
+#pathways <- gmtPathways("C:/Users/guilh/OneDrive/Documentos/GitHub/Extracao_de_Dados/Trabalho_R/h.all.v7.4.entrez.gmt")
+pathways <- gmtPathways("C:/Users/Karyna/Desktop/Github/Extracao_de_Dados/Trabalho_R/h.all.v7.4.entrez.gmt")
 fgseaRes <- fgsea(pathways, ranks)
 ```
 
-```{r,message=FALSE}
+```{r}
 dim(fgseaRes)
 ```
 
-```{r,message=FALSE}
+```{r}
 head(fgseaRes[order(padj), ])
 ```
 
@@ -448,14 +462,17 @@ Nesta fase do trabalho pretende-se dar inicio à análise não supervisionada e 
 
 ## 1. Análise não supervisionada
 
-### 1.1 Redução da dimensionalidade-PCA
+### 1.1 Redução da dimensionalidade {.tabset}
+
 Reducao da dimensionalidade tem como objetivo descobrir um conjunto de dados mais pequeno que o original, dados esses que não são correlacionados mas que são a causa da maior parte da variabilidade dos dados. Esta técnica é comumente feita por Análise de componentes principais (PCA), que se segue aplicada.
 
-```{r}
+#### PCA
+
+```{r, message=FALSE}
 data_rna_LGG_matrix <- as.matrix(assay(ddsSE_norm))
 data_rna_LGG_transposed <- t(data_rna_LGG_matrix)
 
-pairs(data_rna_LGG_transposed)
+#pairs(data_rna_LGG_transposed)
 pcares <- prcomp(data_rna_LGG_transposed, scale. = TRUE)
 #pcares2 = princomp(scale(data_rna_LGG_transposed))
 
@@ -464,7 +481,7 @@ summary(pcares)
 ```
 
 
-```{r}
+```{r, message=FALSE}
 min(which(summary(pcares)$importance[3,]>0.9))
 screeplot(pcares, type = "lines", main = "Variância-pcares")
 ```
@@ -472,7 +489,7 @@ screeplot(pcares, type = "lines", main = "Variância-pcares")
 Depois de colocar o dataset filtrado e normalizado na 1ºParte do trabalho como matriz, realizamos a transposta com o objetivo de analisar a variabilidade entre as amostras, identificando padrões tendo por base a expressão dos genes. Assim, identificamos as componentes principais que explicam 90% da variabilidade das amostras analisadas, tendo obtido um total de 258 PC. Cada PC corresponde a uma combinação linear dos genes, sendo que são ordenadas de acordo com a quantidade de variação que representam onde os primeiro PC estão associados a uma maior variância (como é possivel observar no gráfico Variância-pcares).
 
 
-```{r}
+```{r, message=FALSE}
 plot(pcares$x, col = ddsSE_norm$paper_IDH.status, pch = 19)
 legend("topright",legend=levels(ddsSE_norm$paper_IDH.status), col = 1:2, pch=19)
 ```
@@ -480,16 +497,17 @@ legend("topright",legend=levels(ddsSE_norm$paper_IDH.status), col = 1:2, pch=19)
 Pela interpretação do gráfico de dispersão, podemos observar que a maior parte das amostras se encontram muito próximas umas das outras , ou seja , analisando apenas duas PC não é possivel diferenciar um perfil de expressão genética. Em suma, não seria correto, tendo por base apenas esta análise dimensional, identificar ou separar amostras pertencentes ao grupo Mutante e ao grupo Wild-type.
 
 ```{r}
- summary(pcares$rotation[,1:258])
+#Exemplo dos PC1 e PC2
+ summary(pcares$rotation[,1:2])
 ```
 
-Para completar esta secção poderia ser útil identificar quais variaveis (genes) estão mais fortemente associados a cada PC. Os valores maiores, em módulo, indicam uma maior influência dessas variaveis , sendo que um valor positivo ou negativo tem uma influencia positiva ou negativa,respetivamente.
+Para completar esta secção poderia ser útil identificar quais variaveis (genes) estão mais fortemente associados a cada PC. Os valores maiores, em módulo, indicam uma maior influência dessas variaveis , sendo que um valor positivo ou negativo tem uma influencia positiva ou negativa, respetivamente.
 
-## 2. t-SNE
+#### t-SNE
 
 Este algortitmo de redução de dimensionalidade tem o propósito de mapear pontos de alta dimensionalidade para um espaço de menor dimensionalidade preservando as relações de similiariedade entre pontos. Ou seja, os pontos mais semelhantes (por exemplo com expressão genética semelhante) estariam mais próximos uns dos outros e pontos mais diferentes seriam mapeados mais distantes.
 
-```{r}
+```{r, message=FALSE}
 data_rna_LGG_matrix <- as.matrix(assay(ddsSE_norm))
 Rtsne(data_rna_LGG_matrix)
 data_rna_LGG_matrix_nd = data_rna_LGG_matrix[!duplicated(data_rna_LGG_matrix),]
@@ -500,10 +518,10 @@ plot(res_tnse$Y, col = ddsSE_norm$paper_IDH.status, pch = 19)
 
 Todavia, pelo gráfico obtido é possivel concluir que este algoritmo para as dimensoes analisadas não é suficiente, ou seja, em termos de redução da dimensionalidade dos dados não é deveras suficiente apenas utilizar esta abordagem.Poderia existir uma justificação para esta sobreposição nomeadamente o facto de os dados seerem naturalmente "inseparaveis" numa análise num espaço de menor dimensão e, como tal , esta dimensionalidade reduzida não ser suficiente para capturar toda a estrutura complexa dos dados.
 
-## 2. Clustering 
+## 1.2 Clustering 
 O objetivo do clustering é agrupar dados com base na sua similaridade
 
-### Hierárquico
+### Hierárquico {.tabset}
 Este tipo de agrupamento é feito por probabilidade de pertença, e é uma abordagem aglomerativa que usa a estratégia bottom up, ou seja, há construção de uma árvore que é feita das folhas para a raiz. Os clusters são representados pelos nós. 
 
 ```{r}
@@ -516,7 +534,15 @@ eucD = dist(data_rna_LGG_rank)
 ```
 Há várias formas de calcular a distância entre clusters: single linkage, complete linkage ou average linkage. As  3 formas estão codificadas de seguida.
 
-```{r}
+#### Por genes 
+
+```{r: message=FALSE}
+tt_mdr_g = rowttests(data_rna_LGG_matrix)
+rank_de_mdr_g = order(tt_mdr_g$p.value)
+genes_de_mdr_g = rank_de_mdr_g[1:30]
+data_rna_LGG_rank = data_rna_LGG_matrix[genes_de_mdr,]
+eucD = dist(data_rna_LGG_rank)
+
 ###complete
 cl.hier <- hclust(eucD)
 plot(cl.hier,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:complete, distância Euclidiana")
@@ -532,6 +558,32 @@ plot(cl.hier3,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 
 heatmap(data_rna_LGG_rank, labCol = F, main="Expressão dos 30 genes com menor p-value")
 
 ```
+#### Por pacientes
+
+```{r: message=FALSE}
+tt_mdr = rowttests(t(data_rna_LGG_matrix))
+rank_de_mdr = order(tt_mdr$p.value)
+genes_de_mdr = rank_de_mdr[1:30]
+data_rna_LGG_rank = data_rna_LGG_transposed[genes_de_mdr,]
+eucD = dist(data_rna_LGG_rank)
+
+###complete
+cl.hier <- hclust(eucD)
+plot(cl.hier,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:complete, distância Euclidiana")
+
+###single
+cl.hier2 <- hclust(eucD, method="single")
+plot(cl.hier2,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:single, distância Euclidiana")
+
+###average
+cl.hier3 <- hclust(eucD, method="average")
+plot(cl.hier3,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:average, distância Euclidiana")
+
+heatmap(data_rna_LGG_rank, labCol = F, main="Expressão dos 30 pacientes com menor p-value")
+
+```
+
+### K-Means
 Alternativa é o clustering K-Means. Esta abordagem tenta agrupar os dados de forma a minimizar as distâncias entre os pontos e centróides dos clusters.
 
 Para efetuar o clustering por k-means, de forma a efetuar uma classificação dos grupos observados no PCA, foi primeiro realizada uma siluette analysis sobre os dados logaritmizados com recurso a função fviz_nbclust, que nos indicou que a solução ótima residia em 2 clusters.

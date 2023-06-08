@@ -8,6 +8,9 @@ BiocManager::install("limma")
 BiocManager::install("factoextra")
 install.packages("xfun")
 install.packages("SummarizedExperiment") 
+install.packages("factoextra")
+install.packages("Rtsne")
+
 
 library("DESeq2")
 library("TCGAbiolinks")
@@ -22,9 +25,8 @@ library("factoextra")
 library("limma")
 library("genefilter")
 library("SummarizedExperiment")
-
-
-
+library("factoextra")
+library("Rtsne")
 
 #ObtenC'C#o dos dados
 
@@ -172,7 +174,7 @@ ddsSE <- DESeqDataSet(data_de, design = ~ paper_IDH.status)
 keep <- which(rowSums(counts(ddsSE) >= 10) >= 3) #filtragem tendo em conta uma contagem minima
 
 ddsSE_filtrado <- ddsSE[keep, ] 
-
+dim(ddsSE_filtrado)
 
 ddsSE_norm <- DESeq(ddsSE_filtrado)
 resultsNames(ddsSE_norm)
@@ -200,6 +202,7 @@ genes_padj_fi <- rownames(res)[which(dea$padj < 0.01)]
 
 padj_fi= sum(dea$padj < 0.01, na.rm=TRUE)
 
+dim(genes_padj_fi)
 #AnC!lise da expressC#o diferencial:
 
 
@@ -295,7 +298,7 @@ var_total <- sum(pcares$sdev^2)
 soma_variancias <- sum(head(pcares$sdev^2, 100))
 
 cumulative_variance <- cumsum(variance)
- summary(pcares$rotation[,1:258])
+ summary(pcares$rotation[,1:2])
 
 ###Foi realizada também uma análise de componentes principais (PCA) sobre estes dados de forma a visualizar os dados e efetuar uma redução de dimensionalidade. Os dados já se encontravam normalizados, e do PCA temos que a primeira dimensão agrega 20.7% da variabilidade da amostra, a segunda dimensão 6.9% e a terceira dimensão 3.6%, perfazendo um total de cerca de 31,2% de variabilidade cumulativa. Para perfazer mais de 90% da variabilidade total do dataset, seria necessário acumular 3 componentes.
 plot(pcares$x, col = ddsSE_norm$paper_IDH.status, pch = 19)
@@ -315,8 +318,7 @@ fviz_famd_ind(pcares, geom = c("point"), col.ind = "cos2", gradient.cols = c("#0
               palette = "rainbow", addEllipses = FALSE, ellipse.type = "confidence",
               ggtheme = theme_minimal(), repel = TRUE, labels = F)  
 #tsne
-install.packages("Rtsne")
-library(Rtsne)
+
 
 data_rna_LGG_matrix <- as.matrix(assay(ddsSE_norm))
 data_rna_LGG_transposed <- t(data_rna_LGG_matrix)
@@ -380,7 +382,7 @@ genes_de_mdr_g = rank_de_mdr_g[1:30]
 data_rna_LGG_rank = data_rna_LGG_matrix[genes_de_mdr,]
 
 eucD = dist(data_rna_LGG_rank)
-eucD
+
 ###complete
 cl.hier <- hclust(eucD)
 plot(cl.hier,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:complete, distância Euclidiana")
@@ -400,8 +402,7 @@ heatmap(data_rna_LGG_rank, labCol = F, main="Expressão dos 30 genes com menor p
 ##k-means clustering
 
 ### optimal number of clusters 
-install.packages("factoextra")
-library("factoextra")
+
 
 fviz_nbclust(t(data_rna_LGG_matrix), kmeans, method = "silhouette")
 
