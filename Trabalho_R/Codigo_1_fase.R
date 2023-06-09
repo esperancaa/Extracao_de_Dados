@@ -560,7 +560,7 @@ cat("Sensitivity:", sensitivity, "\n")
 set.seed(16718)
 
 # Definir o grid de hiperparâmetros
-grid <- expand.grid(cp = seq(0.01, 0.1, by = 0.01))
+grid <- expand.grid(cp = c(0.01, 0.02, 0.03), minsplit = c(2, 5, 10), minbucket = c(1, 3, 5))
 
 # Treinar o modelo usando cross-validation
 group_tree_cv <- train(group ~ ., data = trainData[,1:16001], method = "rpart", tuneGrid = grid, trControl = cv.control)
@@ -576,6 +576,32 @@ pred_tree_cv <- predict(final_model, newdata = testData[,1:16001], type = "class
 
 # Métricas
 confusion_matrix <- confusionMatrix(pred_tree_cv, testData$group)
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+#######################################################
+#SVM
+group_svm_cv <- train(group ~ ., 
+                      data = trainData[, 1:16001], 
+                      method = "svmRadial", 
+                      tuneGrid = expand.grid(sigma = c(0.1, 0.2, 0.3), C = c(1, 10, 100),kernel = c("linear", "radial")),
+                      trControl = cv.control)
+
+best_sigma <- group_svm_cv$bestTune$sigma
+best_C <- group_svm_cv$bestTune$C
+pred_svm_cv <- predict(group_svm_cv, newdata = testData[,1:16001])
+
+# Métricas
+confusion_matrix <- confusionMatrix(pred_svm_cv, testData$group)
 precision <- confusion_matrix$byClass["Pos Pred Value"]
 recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
