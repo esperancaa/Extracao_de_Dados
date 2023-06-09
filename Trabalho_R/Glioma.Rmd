@@ -457,7 +457,7 @@ A via metabólica referenciada está descrita na literatura com uma associação
 Em suma, o metabolismo biliar pode estar inderetamente relacionado com o glioma e achamos que como esta associação pode juntar diversas subvias e, como tal, diversos genes é credivel que a Hallmark_bilie_acid_Metabolism seja aquela com maior NES.
 
 
-# 2ª Parte
+# 2ª Parte. Machine Learning
 Nesta fase do trabalho pretende-se dar inicio à análise não supervisionada e supervisionada dos dados.
 
 ## 1. Análise não supervisionada
@@ -522,7 +522,9 @@ Todavia, pelo gráfico obtido é possivel concluir que este algoritmo para as di
 O objetivo do clustering é agrupar dados com base na sua similaridade
 
 ### Hierárquico {.tabset}
+
 Este tipo de agrupamento é feito por probabilidade de pertença, e é uma abordagem aglomerativa que usa a estratégia bottom up, ou seja, há construção de uma árvore que é feita das folhas para a raiz. Os clusters são representados pelos nós. 
+Na análise do cluster hierárquico, a realação de proximidade entre os pontos no espaço multidimensional é dada pela distancia Euclediana, uma métrica bastante utilizada que considera todas as dimensões do espaço. 
 
 ```{r}
 tt_mdr = rowttests(t(data_rna_LGG_matrix))
@@ -532,9 +534,13 @@ data_rna_LGG_rank = data_rna_LGG_matrix[genes_de_mdr,]
 
 eucD = dist(data_rna_LGG_rank)
 ```
-Há várias formas de calcular a distância entre clusters: single linkage, complete linkage ou average linkage. As  3 formas estão codificadas de seguida.
+
+Após calcular a matriz euclediana , várias formas de calcular a distância entre clusters poderia ser aplicadas, nomeadamente: single linkage, complete linkage ou average linkage. As  3 formas estão codificadas de seguida.
+Além disso poderiamos utilizar duas distintas aboradagens na exploração desta técnica , ou seja, poderiamos agrupar por genes ou agrupar por pacientes.
 
 #### Por genes 
+
+Identificar grupos de genes que têm padrões de expressão semehantes entre os pacientes/amostras. Assim, este agrupamento dá informações sobre a similaridade entre os genes, permitindo identificar genes que são coexpressoes e podem até estar envolvidos em vias metabólicas ou processo semelhante.
 
 ```{r: message=FALSE}
 tt_mdr_g = rowttests(data_rna_LGG_matrix)
@@ -543,22 +549,26 @@ genes_de_mdr_g = rank_de_mdr_g[1:30]
 data_rna_LGG_rank = data_rna_LGG_matrix[genes_de_mdr,]
 eucD = dist(data_rna_LGG_rank)
 
-###complete
+#complete
 cl.hier <- hclust(eucD)
 plot(cl.hier,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:complete, distância Euclidiana")
 
-###single
+#single
 cl.hier2 <- hclust(eucD, method="single")
 plot(cl.hier2,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:single, distância Euclidiana")
 
-###average
+#average
 cl.hier3 <- hclust(eucD, method="average")
 plot(cl.hier3,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:average, distância Euclidiana")
 
-heatmap(data_rna_LGG_rank, labCol = F, main="Expressão dos 30 genes com menor p-value")
 
 ```
+
+Fazendo uma análise global dos três métodos de medida de distancia entre clusters analisados podemos concluir que em todos se verifica a presença dos mesmos 30 genes mais diferencialmente expressos. Este aspecto, proporciona confiança nos resultados obtidos, uma vez que, 3 abordagens distintas dão, em suma, a mesma divisão.Além disso, poderiamos dividir estes 30 genes em 3 subgrupos e a partir daí explorar os genes associados.
+
 #### Por pacientes
+
+Identificar grupos de pacientes que se assemlham com base no perfil de expressão genético. Este agrupamente dá informações sobre a similaridade entre os pacientes ajudando a descobrir grupos de subgrupos de pacientes com perfis de expressao semelhantes.
 
 ```{r: message=FALSE}
 tt_mdr = rowttests(t(data_rna_LGG_matrix))
@@ -567,31 +577,60 @@ genes_de_mdr = rank_de_mdr[1:30]
 data_rna_LGG_rank = data_rna_LGG_transposed[genes_de_mdr,]
 eucD = dist(data_rna_LGG_rank)
 
-###complete
+#complete
 cl.hier <- hclust(eucD)
 plot(cl.hier,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:complete, distância Euclidiana")
 
-###single
+#single
 cl.hier2 <- hclust(eucD, method="single")
 plot(cl.hier2,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:single, distância Euclidiana")
 
-###average
+#average
 cl.hier3 <- hclust(eucD, method="average")
 plot(cl.hier3,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:average, distância Euclidiana")
 
-heatmap(data_rna_LGG_rank, labCol = F, main="Expressão dos 30 pacientes com menor p-value")
 
 ```
+
+Fazendo uma análise global dos três métodos de medida de distancia entre clusters analisados podemos concluir que em todos se verifica a presença dos mesmos 30 pacientes com um perfil genético mais diferenciado. Todavia, a escolha de clusters nos tres tipos de aboradagens é mais subjetiva e complicada. Desta forma, não conseguimos garantir uma divisão semelhante em clusters dos 30 pacientes, sendo este um aspecto que poderia causar dificuldade numa futura análise. 
 
 ### K-Means
 Alternativa é o clustering K-Means. Esta abordagem tenta agrupar os dados de forma a minimizar as distâncias entre os pontos e centróides dos clusters.
-
-Para efetuar o clustering por k-means, de forma a efetuar uma classificação dos grupos observados no PCA, foi primeiro realizada uma siluette analysis sobre os dados logaritmizados com recurso a função fviz_nbclust, que nos indicou que a solução ótima residia em 2 clusters.
+Um método muito utilizado para auxiliar na determinação do número adequado de clusters é o "método do cotovelo". Este método envolve a análise da variação da soma dos quadrados intra-cluster (WSS) em relação ao número de clusters
 
 ```{r}
+ofs <- c()
+for (k in 2:10) {
+  kmeans <- kmeans(t(data_rna_LGG_matrix), centers = k, nstart = 10)
+  ofs <- c(ofs, kmeans$tot.withinss)
+}
+plot_data <- data.frame(num_clusters = 2:10, wss = ofs)
 
-fviz_nbclust(t(data_rna_LGG_matrix), kmeans, method = "silhouette")
+ggplot(plot_data, aes(x = num_clusters, y = wss)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Num Clusters", y = "WSS") +
+  theme_minimal()
 ```
+
+Através da observação do gráfico é possivel verificar que o ponto no gráfico que se assemelha a um "cotovelo" é o ponto com K=6 , ou seja a partir daqui a adição de mais clusters não resulta numa redução significativa da WSS.
+Partindo desse principio, decidimos aplicar o algoritmo do Kmeans, tendo como referência o valor de 6 centroides, de modo a criar uma tabela que nos permitisse analisar a distribuição dos pacientes nos cluesters em relação ao metadado estudado.
+
+
+```{r}
+resKmeans <- kmeans(t(data_rna_LGG_matrix),centers=6)
+resKmeans
+centroides=resKmeans$cluster
+table_result=table(centroides, ddsSE_filtrado$paper_IDH.status)
+```
+
+Através da interpretação da tabela é possivel verificar que existem clusters que têm uma separação diferenciada no que concerne ao metadado analisado , cumprindo o principal propósito do k-means. Todavia, existem clusters cuja separação não é a ideal e, nós pensamos que esse aspecto poderia ser ultrupassado se por ventura aumentarmos o valor de clusters.
+
+## Análise Supervisionada
+
+Nesta etapa do trabalho o objetivo é fazer previsoes tendo por base os dados existentes, ou seja, prever a classificação  de uma nova amostra.
+Para tal foram treinados e testados 5 modelos: __k-Nearest Neighbors__, __Naive Bayes__, __Decision Trees__, __Regression Trees__, __Neural Networks__
+Para todos os modelos fizemos uma partição do nosso dataset em 70-30, ou seja 70 % treino e 30% teste, além disso foi utilizado uma cross validation com 10 folds repetida 5 vezes. Para tornar estes resultados replicáveis , foi invocado uma seed 16718.
 
 
 

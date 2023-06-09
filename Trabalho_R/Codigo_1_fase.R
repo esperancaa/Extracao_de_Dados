@@ -409,23 +409,62 @@ fviz_nbclust(t(data_rna_LGG_matrix), kmeans, method = "silhouette")
 ##Para efetuar o clustering por k-means, de forma a efetuar uma classificação dos grupos observados no PCA, foi primeiro realizada uma siluette analysis sobre os dados logaritmizados com recurso a função fviz_nbclust, que nos indicou que a solução ótima residia em 2 clusters.
 
 ### Map of predicted clusters
+install.packages("heatmaply")
+library(heatmaply)
 
-resKmeans <- kmeans(data_rna_LGG_matrix,centers=3)
+resKmeans <- kmeans(t(data_rna_LGG_matrix),centers=6)
 resKmeans
-resKmeans$cluster
+centroides=resKmeans$cluster
+table_result=table(centroides, ddsSE_filtrado$paper_IDH.status)
+#plot(data_rna_LGG_transposed[,1],ddsSE_norm$paper_IDH.status, col = resKmeans$cluster, pch = 16)
+library(ggplot2)
+library(cluster)
+#cotovelo
+ofs <- c()
+
+for (k in 2:10) {
+  kmeans <- kmeans(t(data_rna_LGG_matrix), centers = k, nstart = 10)
+  ofs <- c(ofs, kmeans$tot.withinss)
+}
+
+plot_data <- data.frame(num_clusters = 2:10, wss = ofs)
+
+ggplot(plot_data, aes(x = num_clusters, y = wss)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Num Clusters", y = "WSS") +
+  theme_minimal()
+
+
+
+
+# Adicionar legendas aos pontos
+legend("topright", legend = 1:3, col = 1:3, pch = 8, cex = 1.2)
+
+# Adicionar título e rótulos dos eixos
+title("Gráfico de Clusters - K-means")
+xlabel <- "Variável X"
+ylabel <- "Variável Y"
+xlab(xlabel)
+ylab(ylabel)
 
 #não consegui fazer o gráfico dos clusters k-mean porque está a faltar um metadado
 
 #Análise supervisionada (Machine Learning)
-
+#parece tudo bem- temos divisao data treino e teste
+#classe 1 e 2 
+#temos gráfico para mostrar a distribuição destas classe
 set.seed(16718)
 data_rna_LGG_data <- data.frame(data_rna_LGG_matrix)
+dim(data_rna_LGG_matrix)
 
 ml_mutants <- as.data.frame(cbind(group = meta_LGG$paper_IDH.status, t(data_rna_LGG_data)))
 ml_mutants_na <- na.omit(ml_mutants)
 ml_mutants_na$group = as.factor(ml_mutants_na$group)
 ml_mutants_na$group
-
+frequencia <- table(ml_mutants_na$group)
+cores <- rainbow(length(frequencia))
+pie(frequencia, col = cores)
 # 1= MUTANT   2= WT
 
 #Percentagem de exemplos corretamente classificados
@@ -445,12 +484,34 @@ dim(trainData)
 dim(testData)
 table(trainData$group)
 table(testData$group)
+##############################################################
+#Todavia isso nao garante a preservação das proporções das classe no treino e test
+install.packages("rsample")
+library(rsample)
+library(caret)
+
+set.seed(16718)
+# Criar as dobras estratificadas usando o pacote rsample
+folds <- rsample::vfold_cv(ml_mutants, strata = "group", v = 10)
+
+# Configurar o objeto trainControl com as dobras estratificadas
+cv.control <- trainControl(method = "repeatedcv", number = 10, repeats = 5, index = folds$split)
+
+# Executar o treinamento usando o trainControl modificado
+set.seed(16718)
+group_knn_cv <- train(group ~ ., data = trainData[,1:30000], method = "knn", tuneGrid = expand.grid(k = 1:10), trControl = cv.control)
+best_k <- group_knn_cv$bestTune$k
+pred_kn_cv <- predict(group_knn_cv, newdata = testData)
+
+######################################################3
+
 
 ### Métodos baseados em instâncias
 
 #k-Nearest Neighbors 
 
 library(class)
+#esta mal deveria ser em relação ao nosso dataset!
 knn_pred = knn(trainData[,1:4], testData[,1:4], trainData$group) 
 knn_pred
 
