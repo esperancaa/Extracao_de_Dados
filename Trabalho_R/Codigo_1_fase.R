@@ -456,17 +456,21 @@ ylab(ylabel)
 #temos gráfico para mostrar a distribuição destas classe
 set.seed(16718)
 data_rna_LGG_data <- data.frame(data_rna_LGG_matrix)
-dim(data_rna_LGG_matrix)
-
 ml_mutants <- as.data.frame(cbind(group = meta_LGG$paper_IDH.status, t(data_rna_LGG_data)))
 ml_mutants_na <- na.omit(ml_mutants)
+dim(ml_mutants_na)
 ml_mutants_na$group = as.factor(ml_mutants_na$group)
 ml_mutants_na$group
+select_genee <- rownames(head(resOrdered,16000)) #top 16000 pelo p-adjust
+
+# Crie um novo dataframe apenas com os genes selecionados
+ml_mutants_selected <- ml_mutants_na[, c("group", select_genee)]
+
+ml_mutants_selected$group
 frequencia <- table(ml_mutants_na$group)
 cores <- rainbow(length(frequencia))
 pie(frequencia, col = cores)
 # 1= MUTANT   2= WT
-
 #Percentagem de exemplos corretamente classificados
 pecc = function(obs,pred) sum(obs==pred)/length(obs)
 
@@ -477,9 +481,9 @@ rmse = function(obs, pred) sqrt(mean((obs-pred)^2))
 mad = function(obs, pred) mean(abs(obs-pred))
 
 #Divisão em train e test em 70%, 30%
-ind = sample(2, nrow(ml_mutants_na), replace=TRUE, prob=c(0.7, 0.3)) 
-trainData = ml_mutants_na[ind==1,]
-testData = ml_mutants_na[ind==2,]
+ind = sample(2, nrow(ml_mutants_selected), replace=TRUE, prob=c(0.7, 0.3)) 
+trainData = ml_mutants_selected[ind==1,]
+testData = ml_mutants_selected[ind==2,]
 dim(trainData)
 dim(testData)
 table(trainData$group)
@@ -492,23 +496,100 @@ library(caret)
 
 set.seed(16718)
 # Criar as dobras estratificadas usando o pacote rsample
-folds <- rsample::vfold_cv(ml_mutants, strata = "group", v = 10)
+folds <- rsample::vfold_cv(ml_mutants_selected, strata = "group", v = 10)
 
 # Configurar o objeto trainControl com as dobras estratificadas
 cv.control <- trainControl(method = "repeatedcv", number = 10, repeats = 5, index = folds$split)
 
 # Executar o treinamento usando o trainControl modificado
 set.seed(16718)
-group_knn_cv <- train(group ~ ., data = trainData[,1:30000], method = "knn", tuneGrid = expand.grid(k = 1:10), trControl = cv.control)
+group_knn_cv <- train(group ~ ., data = trainData[,1:16001], method = "knn", tuneGrid = expand.grid(k = 1:10), trControl = cv.control)
 best_k <- group_knn_cv$bestTune$k
-pred_kn_cv <- predict(group_knn_cv, newdata = testData)
+best_k
 
-######################################################3
+pred_kn_cv <- predict(group_knn_cv, newdata = testData[,1:16001])
+pred_kn_cv
+
+#métricas
+predictions <- pred_kn_cv
 
 
-### Métodos baseados em instâncias
+# Criar a matriz de confusão
+confusion_matrix <- confusionMatrix(predictions, testData$group)
 
-#k-Nearest Neighbors 
+confusion_matrix
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+######################################################
+#naive bayes
+group_nb_cv <- train(group ~ ., data = trainData[,1:16001], method = "nb", trControl = cv.control)
+pred_nb_cv <- predict(group_nb_cv, newdata = testData[,1:16001])
+
+#métricas
+predictions <- pred_nb_cv
+
+
+# Criar a matriz de confusão
+confusion_matrix <- confusionMatrix(predictions, testData$group)
+
+confusion_matrix
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+#####################################################
+# Decision Trees
+set.seed(16718)
+
+# Definir o grid de hiperparâmetros
+grid <- expand.grid(cp = seq(0.01, 0.1, by = 0.01))
+
+# Treinar o modelo usando cross-validation
+group_tree_cv <- train(group ~ ., data = trainData[,1:16001], method = "rpart", tuneGrid = grid, trControl = cv.control)
+
+# Obter o melhor hiperparâmetro
+best_cp <- group_tree_cv$bestTune$cp
+
+# Treinar o modelo final com o melhor hiperparâmetro
+final_model <- rpart(group ~ ., data = trainData[,1:16001], method = "class", cp = best_cp)
+
+# Fazer previsões em novos dados
+pred_tree_cv <- predict(final_model, newdata = testData[,1:16001], type = "class")
+
+# Métricas
+confusion_matrix <- confusionMatrix(pred_tree_cv, testData$group)
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+
+#k-Nearest Neighbors -Rodrigo
 
 library(class)
 #esta mal deveria ser em relação ao nosso dataset!

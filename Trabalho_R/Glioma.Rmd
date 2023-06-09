@@ -626,16 +626,135 @@ table_result=table(centroides, ddsSE_filtrado$paper_IDH.status)
 
 Através da interpretação da tabela é possivel verificar que existem clusters que têm uma separação diferenciada no que concerne ao metadado analisado , cumprindo o principal propósito do k-means. Todavia, existem clusters cuja separação não é a ideal e, nós pensamos que esse aspecto poderia ser ultrupassado se por ventura aumentarmos o valor de clusters.
 
-## Análise Supervisionada
+## Análise Supervisionada {.tabset}
 
 Nesta etapa do trabalho o objetivo é fazer previsoes tendo por base os dados existentes, ou seja, prever a classificação  de uma nova amostra.
-Para tal foram treinados e testados 5 modelos: __k-Nearest Neighbors__, __Naive Bayes__, __Decision Trees__, __Regression Trees__, __Neural Networks__
-Para todos os modelos fizemos uma partição do nosso dataset em 70-30, ou seja 70 % treino e 30% teste, além disso foi utilizado uma cross validation com 10 folds repetida 5 vezes. Para tornar estes resultados replicáveis , foi invocado uma seed 16718.
+Para tal foram treinados e testados 5 modelos: __k-Nearest Neighbors__, __Naive Bayes__, __Decision Trees__, __Regression Trees__, __Neural Networks__ .
+Contudo, um dos problemas que nos apareceu estava associado a limitação de memoria no R-Studio, ou seja, não estavamos a conseguir trabalhar com um dataset tão extenso. Posto isto, uma alternativa foi trabalhar com os 16000 genes com menor padjust e, portanto, os 16000 genes mais diferencialmente expressos. Sabemos que poderíamos optar por explorar aqui os resultados do PCA, contudo foi opção nossa utilizar a primeira abordagem.
 
 
+```{r}
+set.seed(16718)
+data_rna_LGG_data <- data.frame(data_rna_LGG_matrix)
+ml_mutants <- as.data.frame(cbind(group = meta_LGG$paper_IDH.status, t(data_rna_LGG_data)))
+ml_mutants_na <- na.omit(ml_mutants)
+ml_mutants_na$group = as.factor(ml_mutants_na$group)
+select_genee <- rownames(head(resOrdered,16000)) #top 16000 pelo p-adjust
+# Crie um novo dataframe apenas com os genes selecionados
+ml_mutants_selected <- ml_mutants_na[, c("group", select_genee)]
+```
+
+Para todos os modelos fizemos uma partição do nosso dataset em 70-30, ou seja 70 % treino e 30% teste.
+
+```{r}
+ind = sample(2, nrow(ml_mutants_selected), replace=TRUE, prob=c(0.7, 0.3)) 
+trainData = ml_mutants_selected[ind==1,]
+testData = ml_mutants_selected[ind==2,]
+dim(trainData)
+dim(testData)
+table(trainData$group)
+table(testData$group)
+```
+
+Além disso foi utilizado uma cross validation com 10 folds repetida 5 vezes. Para tornar estes resultados replicáveis , foi invocado uma seed 16718. Um aspecto que também se teve em consiração foi a diferente proporção entre a classe 1- Mutante e a classe 2 WT, daí se ter utilizado a primeira linha de código descrita abaixo.
+
+```{r}
+#rerpesentação grafica da distribuição da classe 1 e 2
+ml_mutants_selected$group
+frequencia <- table(ml_mutants_na$group)
+cores <- rainbow(length(frequencia))
+pie(frequencia, col = cores)
+
+# Criar as dobras estratificadas usando o pacote rsample
+folds <- rsample::vfold_cv(ml_mutants_selected, strata = "group", v = 10)
+
+# Configurar o objeto trainControl com as dobras estratificadas
+cv.control <- trainControl(method = "repeatedcv", number = 10, repeats = 5, index = folds$split)
+```
 
 
+### K-Nearest Neighbors
+O algoritmo agora abordado, tende a agrupar os objetos semelhantes a uma mesma classe. Portanto , classifica uma amostra com base na classe predominante entre os seus vizinhos mais próximos. Posto isto, um aspeto importante quando se explorar este algortitmo de ML é a determinação do hiperparametro K , sendo que a nossa abordagem foi explorar em primeiro lugar qual seria de 1 a 10 o valor de K mais adequado/otimizado.
 
+```{r}
+#treino
+set.seed(16718)
+group_knn_cv <- train(group ~ ., data = trainData[,1:16001], method = "knn", tuneGrid = expand.grid(k = 1:10), trControl = cv.control)
+best_k <- group_knn_cv$bestTune$k
+best_k
+```
+
+Após treinar o modelo e ter o hiperparametro definido, fomos testar o mesmo com o intuito prever a que classe iria pertencer as amostras agora analisadas.
+
+```{r}
+#teste
+pred_kn_cv <- predict(group_knn_cv, newdata = testData[,1:16001])
+predictions <- pred_kn_cv
+```
+
+Como parte final e de modo a avaliar o modelo em estudo analisamos as métricas , isto é , verificamos o quão assertivo é a previsão do nosso modelo face aos dados do teste.
+
+```{r}
+# Criar a matriz de confusão
+confusion_matrix <- confusionMatrix(predictions, testData$group)
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+confusion_matrix
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+```
+
+Tebdo em conta as métricas analisadas queremos salientar a XXX coo XX % sendo este o parametro que daqui em diante iremos comparar entre os modelos estudados com o intuito de escolher um melhor modelo.
+
+### Naive Bayes
+Para este modelo em particular nao foi avaliado nenhum hiperparametro em especifico , tendo sido apenas treinado o algoritmo de ML em estudo face ao dataset previamente dividido.
+
+```{r}
+group_nb_cv <- train(group ~ ., data = trainData[,1:16001], method = "nb", trControl = cv.control)
+```
+
+De seguida, aplicou-se o modelo treinado para prever as classes das amostras presentes no dataset de test.
+
+```{r}
+pred_nb_cv <- predict(group_nb_cv, newdata = testData[,1:16001])
+
+```
+
+O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respetivas métricas.
+
+```{r}
+#métricas
+predictions <- pred_nb_cv
+
+
+# Criar a matriz de confusão
+confusion_matrix <- confusionMatrix(predictions, testData$group)
+
+confusion_matrix
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+```
+
+Tebdo em conta as métricas analisadas queremos salientar a XXX coo XX % sendo este o parametro que daqui em diante iremos comparar entre os modelos estudados com o intuito de escolher um melhor modelo.
+
+### Decision Tree
 
 ## Bibliografia
 1. Haddad, A.F., Young, J.S., Oh, J.Y., Okada, H., Aghi, M.K.: The immunology of low-grade gliomas. Neurosurg. Focus. 52, E2 (2022). https://doi.org/10.3171/2021.11.FOCUS21587.
