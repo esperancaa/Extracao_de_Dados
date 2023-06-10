@@ -52,6 +52,10 @@ library("genefilter")
 library("SummarizedExperiment")
 library("factoextra")
 library("Rtsne")
+library("party")
+library("rpart")
+library("caret") 
+library("rsample")
 ```
 
 ## 2. Introdução
@@ -629,8 +633,8 @@ Através da interpretação da tabela é possivel verificar que existem clusters
 ## Análise Supervisionada {.tabset}
 
 Nesta etapa do trabalho o objetivo é fazer previsoes tendo por base os dados existentes, ou seja, prever a classificação  de uma nova amostra.
-Para tal foram treinados e testados 5 modelos: __k-Nearest Neighbors__, __Naive Bayes__, __Decision Trees__, __Regression Trees__, __Neural Networks__ .
-Contudo, um dos problemas que nos apareceu estava associado a limitação de memoria no R-Studio, ou seja, não estavamos a conseguir trabalhar com um dataset tão extenso. Posto isto, uma alternativa foi trabalhar com os 16000 genes com menor padjust e, portanto, os 16000 genes mais diferencialmente expressos. Sabemos que poderíamos optar por explorar aqui os resultados do PCA, contudo foi opção nossa utilizar a primeira abordagem.
+Para tal foram treinados e testados 6 modelos: __k-Nearest Neighbors__, __Naive Bayes__, __Random Forest__, __Decision Trees__, __Support Vector Machine__, __Neural Networks__ .
+Contudo, um dos problemas que nos apareceu estava associado a limitação de memoria no R-Studio, ou seja, não estavamos a conseguir trabalhar com um dataset tão extenso. Posto isto, uma alternativa foi trabalhar com os 900 genes com menor padjust e, portanto, os 900 genes mais diferencialmente expressos. Sabemos que poderíamos optar por explorar aqui os resultados do PCA, contudo foi opção nossa utilizar a primeira abordagem.
 
 
 ```{r}
@@ -639,7 +643,7 @@ data_rna_LGG_data <- data.frame(data_rna_LGG_matrix)
 ml_mutants <- as.data.frame(cbind(group = meta_LGG$paper_IDH.status, t(data_rna_LGG_data)))
 ml_mutants_na <- na.omit(ml_mutants)
 ml_mutants_na$group = as.factor(ml_mutants_na$group)
-select_genee <- rownames(head(resOrdered,16000)) #top 16000 pelo p-adjust
+select_genee <- rownames(head(resOrdered,16000)) #top 16000 pelo p-adjust, mas depois ficamos com o top 900
 # Crie um novo dataframe apenas com os genes selecionados
 ml_mutants_selected <- ml_mutants_na[, c("group", select_genee)]
 ```
@@ -656,7 +660,7 @@ table(trainData$group)
 table(testData$group)
 ```
 
-Além disso foi utilizado uma cross validation com 10 folds repetida 5 vezes. Para tornar estes resultados replicáveis , foi invocado uma seed 16718. Um aspecto que também se teve em consiração foi a diferente proporção entre a classe 1- Mutante e a classe 2 WT, daí se ter utilizado a primeira linha de código descrita abaixo.
+Além disso foi utilizado uma cross validation com 10 folds repetida 5 vezes. Para tornar estes resultados replicáveis , foi invocado uma seed 16718. Um aspecto que também se teve em consiração foi a diferente proporção entre a classe 1- Mutante e a classe 2 WT, daí se ter utilizado a primeiro bloco  de código descrita abaixo.
 
 ```{r}
 #rerpesentação grafica da distribuição da classe 1 e 2
@@ -674,12 +678,12 @@ cv.control <- trainControl(method = "repeatedcv", number = 10, repeats = 5, inde
 
 
 ### K-Nearest Neighbors
-O algoritmo agora abordado, tende a agrupar os objetos semelhantes a uma mesma classe. Portanto , classifica uma amostra com base na classe predominante entre os seus vizinhos mais próximos. Posto isto, um aspeto importante quando se explorar este algortitmo de ML é a determinação do hiperparametro K , sendo que a nossa abordagem foi explorar em primeiro lugar qual seria de 1 a 10 o valor de K mais adequado/otimizado.
+O algoritmo agora abordado, tende a agrupar os objetos semelhantes a uma mesma classe. Portanto , classifica uma amostra com base na classe predominante entre os seus vizinhos mais próximos. Posto isto, um aspeto importante quando se explora este algortitmo de ML é a determinação do hiperparametro K , sendo que a nossa abordagem foi explorar em primeiro lugar qual seria de 1 a 10 o valor de K mais adequado/otimizado.
 
 ```{r}
 #treino
 set.seed(16718)
-group_knn_cv <- train(group ~ ., data = trainData[,1:16001], method = "knn", tuneGrid = expand.grid(k = 1:10), trControl = cv.control)
+group_knn_cv <- train(group ~ ., data = trainData[,1:901], method = "knn", tuneGrid = expand.grid(k = 1:10), trControl = cv.control)
 best_k <- group_knn_cv$bestTune$k
 best_k
 ```
@@ -688,15 +692,15 @@ Após treinar o modelo e ter o hiperparametro definido, fomos testar o mesmo com
 
 ```{r}
 #teste
-pred_kn_cv <- predict(group_knn_cv, newdata = testData[,1:16001])
-predictions <- pred_kn_cv
+pred_kn_cv <- predict(group_knn_cv, newdata = testData[,1:901])
 ```
 
 Como parte final e de modo a avaliar o modelo em estudo analisamos as métricas , isto é , verificamos o quão assertivo é a previsão do nosso modelo face aos dados do teste.
 
 ```{r}
 # Criar a matriz de confusão
-confusion_matrix <- confusionMatrix(predictions, testData$group)
+confusion_matrix <- confusionMatrix(pred_kn_cv, testData$group)
+confusion_matrix
 precision <- confusion_matrix$byClass["Pos Pred Value"]
 recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
@@ -712,31 +716,27 @@ cat("F1-score:", f1_score, "\n")
 cat("Sensitivity:", sensitivity, "\n")
 ```
 
-Tebdo em conta as métricas analisadas queremos salientar a XXX coo XX % sendo este o parametro que daqui em diante iremos comparar entre os modelos estudados com o intuito de escolher um melhor modelo.
+Tedo em conta as métricas analisadas queremos salientar a accuracy com 95,36 %, sendo esta a métrica de referência que daqui em diante iremos comparar entre os modelos estudados com o intuito de escolher um melhor modelo.
 
 ### Naive Bayes
-Para este modelo em particular nao foi avaliado nenhum hiperparametro em especifico , tendo sido apenas treinado o algoritmo de ML em estudo face ao dataset previamente dividido.
+Para este modelo em particular nao foi avaliado nenhum hiperparametro em especifico , tendo sido apenas treinado o algoritmo de ML em estudo face ao dataset previamente dividido. Este algoritmo baseia-se no teorema de Bayes e na suposição de independencia condicional entre as variaveis.
 
 ```{r}
-group_nb_cv <- train(group ~ ., data = trainData[,1:16001], method = "nb", trControl = cv.control)
+set.seed(16718)
+group_nb_cv <- train(group ~ ., data = trainData[,1:901], method = "nb", trControl = cv.control)
 ```
 
 De seguida, aplicou-se o modelo treinado para prever as classes das amostras presentes no dataset de test.
 
 ```{r}
-pred_nb_cv <- predict(group_nb_cv, newdata = testData[,1:16001])
-
+pred_nb_cv <- predict(group_nb_cv, newdata = testData[,1:901])
 ```
 
 O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respetivas métricas.
 
 ```{r}
-#métricas
-predictions <- pred_nb_cv
-
-
 # Criar a matriz de confusão
-confusion_matrix <- confusionMatrix(predictions, testData$group)
+confusion_matrix <- confusionMatrix(pred_nb_cv, testData$group)
 
 confusion_matrix
 precision <- confusion_matrix$byClass["Pos Pred Value"]
@@ -750,11 +750,190 @@ cat("Precision:", precision, "\n")
 cat("Recall:", recall, "\n")
 cat("Accuracy:", accuracy, "\n")
 cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
 ```
 
-Tebdo em conta as métricas analisadas queremos salientar a XXX coo XX % sendo este o parametro que daqui em diante iremos comparar entre os modelos estudados com o intuito de escolher um melhor modelo.
+Tendo em conta as métricas analisadas queremos salientar a accuracy com 96.69 %.
+
+### Random Forest
+O algoritmo em questão combina a previsão de várias árvores de decisão para melhorar a precisão e a robustez do modelo, sendo baseado num conceito de "ensemble learning". Exploramos ainda a melhor combinação dos hiperparametros.
+
+```{r}
+group_rf_cv <- train(group ~ ., data = trainData[,1:901], method = "rf", tuneLenght=10, trControl = cv.control)
+```
+
+O modelo treinado com a melhor combinação dos hiperparametros em questão é depois aplicado para prever as classes no dataset de teste.
+
+```{r}
+pred_rf_cv <- predict(group_rf_cv, newdata = testData[,1:901])
+```
+
+O desempenho deste modelo foi avaliado com auxilio da confusion matrix e respetivas métricas.
+
+```{r}
+# Métricas
+confusion_matrix <- confusionMatrix(pred_rf_cv, testData$group)
+confusion_matrix
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+```
+
+Tendo em conta as métricas analisadas queremos salientar a accuracy com 98,68 %.
 
 ### Decision Tree
+Este algoritmo em particular explora uma estrutura hierárquica semelhante a uma árvore, sendo que as decisões/previsão são tomadas com base em regras de decisão aprendidas durante a etapa de treinamento. Assim cada nó de decisão representa uma condição que é utilizada para dividir os dados em subconjuntos mais especificos.
+Para este algoritmo em particular foram explorados  hiperparametros, nomeadamente, cp. Salientando que o processo de treinamento e realizado tendo em conta esses hiperparametros , em particular, o melhor conjunto dos mesmos.
+
+```{r}
+set.seed(16718)
+group_tree_cv <- train(group ~ ., data = trainData[,1:901], method = "rpart", tuneLength = 10, trControl = cv.control)
+# Obter o melhor hiperparâmetro
+best_cp <- group_tree_cv$bestTune$cp
+
+# Treinar o modelo final com o melhor hiperparâmetro
+final_model <- rpart(group ~ ., data = trainData[,1:901], method = "class", cp = best_cp)
+```
+
+O modelo treinado é depois aplicado para prever as classes no datasset de teste. 
+
+```{r}
+# Fazer previsões em novos dados
+pred_tree_cv <- predict(final_model, newdata = testData[,1:901], type = "class")
+```
+
+O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respetivas métricas.
+
+```{r}
+# Métricas
+confusion_matrix <- confusionMatrix(pred_tree_cv, testData$group)
+confusion_matrix
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+```
+
+Tendo em conta as métricas analisadas queremos salientar a accuracy com 96.69 % 
+
+### SVM
+O algortitmo em estudo tem como objetivo principal encontrar o hiperplano de separação ótimo que maximiza a separação entre as classes. Assim, de modo a explorar melhor este algoritmo foram explorados a melhor combinação dos seguintes hiperparametros: sigma e C.
+
+```{r}
+set.seed(16718)
+group_svm_cv <- train(group ~ ., 
+                      data = trainData[, 1:901], 
+                      method = "svmRadial", 
+                      tuneGrid = expand.grid(sigma = c(0.1, 0.2, 0.3), C = c(1, 10, 100)),
+                      trControl = cv.control)
+
+best_sigma <- group_svm_cv$bestTune$sigma
+best_C <- group_svm_cv$bestTune$C
+
+```
+
+O modelo treinado com a melhor combinação dos hiperparametros em questão é depois aplicado para prever as classes no dataset de teste. 
+
+```{r}
+pred_svm_cv <- predict(group_svm_cv, newdata = testData[,1:901])
+```
+
+O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respetivas métricas.
+
+```{r}
+# Métricas
+confusion_matrix <- confusionMatrix(pred_svm_cv, testData$group)
+confusion_matrix
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+```
+
+Tendo em conta as métricas analisadas queremos salientar a accuracy com 82,78 %.
+
+### Neural Networks
+Este algoritmo já se encontra associado ao deep learning, sendo que tem como inspiração o funcionamento do cerebro humano. Em suma explora unidades interconectadas( unidade de processamento) que são organizadas em camadas. Os  hiperparametros tambem foram avaliados.
+
+```{r}
+set.seed(16718)
+group_nn_cv = train(group~., data = trainData[, 1:901], method = "nnet", tuneLenght=10, trControl=cv.control, maxit = 100,)
+```
+
+O modelo treinado com a melhor combinação dos hiperparametros em questão é depois aplicado para prever as classes no dataset de teste.
+
+```{r}
+pred_nn_cv <- predict(group_nn_cv, newdata = testData[, 1:901])
+```
+
+O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respetivas métricas.
+
+```{r}
+#métricas
+confusion_matrix <- confusionMatrix(pred_nn_cv, testData$group)
+confusion_matrix
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+```
+
+Tendo em conta as métricas analisadas queremos salientar a accuracy com 96,03 %.
+
+## Melhor modelo
+
+Após observação da accuracy dos 6 modelos para a classificação da classe mutante ou wild type do composto isocitrato desidrogenase (IDH), selecionou-se o modelo obtido a partir do algoritmo de “Random Forest” como aquele com maior accuracy entre os restantes, tomando esta o valor de \(98,68\%\).
+
+## Importância das variaveis
+
+Por último, foi realizada a seleção de atributos para o dataset considerado para machine learning, através do método de Recursive Feature Elimination. Este algoritmo foi implementado com uma estimação do erro correspondente a validação cruzada 10 folds.
+Através do argumento “sizes”, foi dado ao algoritmo o tamanho das amostragens de variáveis a testar.
+
+```{r}
+set.seed(16718)
+control <- rfeControl(functions=rfFuncs, method="cv", number=10)
+ml_mutants_selected= ml_mutants_selected[,1:901]
+results <- rfe(group~., data = ml_mutants_selected, rfeControl=control, sizes=c(1:10,20,40,60,80,100,150,200,300,400,500,600,700,800))
+results
+```
+
+Assim, foi determinado que dos \(900\) genes fornecidos, \(40\) permitiam uma melhor precisão do algoritmo.
+Sendo que decidimos util confirmar o que foi obtido com a informação descrita na literatura para 3 dos top 5 genes dados:   __ENSG00000161798.7__, __ENSG00000215612.8__ e __ENSG00000179299.17__ .
+A base de dados "The humam protein Atlas" confirma que esses tres genes estão associados ao glioma
+
 
 ## Bibliografia
 1. Haddad, A.F., Young, J.S., Oh, J.Y., Okada, H., Aghi, M.K.: The immunology of low-grade gliomas. Neurosurg. Focus. 52, E2 (2022). https://doi.org/10.3171/2021.11.FOCUS21587.
