@@ -24,7 +24,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Esta secção mostra todos os packages utilizados para, a partir dos mesmos, ser mais fácil obter e interpretar informação sobre um determinado conjunto de dados.
 
-```{r, results='hide'}
+```{r, results='hide', warning = FALSE, message=FALSE, warning = FALSE, message=FALSE}
 #install.packages("TCGAbiolinks")
 #install.packages("Biobase")
 #install.packages("DESeq2")
@@ -34,9 +34,13 @@ Esta secção mostra todos os packages utilizados para, a partir dos mesmos, ser
 #install.packages("org.Hs.eg.db")
 #install.packages("fgsea")
 #install.packages("ggplot2")
+#install.packages("xfun")
+#install.packages("SummarizedExperiment") 
+#install.packages("factoextra")
+#install.packages("Rtsne")
 ```
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE,warning = FALSE, message=FALSE}
 library("DESeq2")
 library("TCGAbiolinks")
 library("Biobase")
@@ -77,7 +81,7 @@ Em seguida, a função GDCdownload() é utilizada para transfereir os dados corr
 A função GDCprepare() serve para preparar os dados do TCGA para análise no R.
 Assim a variável data_rna_LGG contém os dados de expressão genética organizados juntamente com informações de metadados.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 query_LGG <- GDCquery(project = "TCGA-LGG", 
                   data.category = "Transcriptome Profiling", 
                   data.type = "Gene Expression Quantification", 
@@ -104,7 +108,7 @@ Outro aspecto importante a analisar são os metadados, que nos dão informaçõe
 Os metadados são fundamentais para a interpretação correta dos dados, permitindo também a reutilização dos dados por outros investigadores.
 Tendo isso em consideração, em primeiro lugar foi utilizada a biblioteca Biobase que facilita a análise dos metadados. Assim, com auxilio da função colData foi possível extrair os metadados, seguindo-se para a verificação das dimensões dos mesmos.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 meta_LGG = colData(data_rna_LGG)
 dim(meta_LGG)
 colnames(meta_LGG)
@@ -131,7 +135,7 @@ dim(metadata_matriz_clean)
 Após esta filtragem obteve-se 78 colunas. Sabemos que, seria possível filtrar ainda mais, contudo nesta fase inicial, apenas eliminamos essas colunas.
 Para iniciar a análise, verificou-ser a descrição sumária das colunas resultantes.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 metadados_teste=as.data.frame(metadata_matriz_clean)
 summary(metadados_teste)
 ```
@@ -161,7 +165,7 @@ O astroctioma, o oligodendroglioma e o mixed glioma são subtipos específicos d
 #### Distribuição por género
 Relativamente à variavel do metadado gender, foram calculadas as frequências e desenhado um gráfico circular com base nesses valores.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 counts <- table(metadata_matriz_clean$gender)
 colors <- c("pink", "lightblue")
 pie(counts, col = colors, main = "Distribuição por género")
@@ -196,7 +200,7 @@ Além disso, pela simples observação do gráfico, é possivel verificar que mu
 #### Idade aquando dignóstico e estado vital
 Tendo por base o mesmo raciocinio, ou seja, verificar se realmente há uma relação entre a idade dos pacientes quando foram diagnósticados e o facto de o paciente se encontrar vivo ou morto, procedemos à análise destes aspetos em simultâneo, tendo em atenção valores "not reported" e "NA".
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 merged_data <- data.frame(status_vital = (metadata_matriz_clean$vital_status), 
                           idade_diagnostico = (metadata_matriz_clean$age_at_index))
 merged_data <- na.omit(merged_data)
@@ -208,7 +212,7 @@ De modo a poder observar a relação entre a idade de diagnóstico e o estado de
 Onde pela sua simples interpretação não parece existir uma relação significativa entre um diagnóstico mais recente estar ou não associado a um determinado estado vital, vivo ou morto.
 Contudo, realizou-se var teste e t-test para realmente verificar se há diferença de médias da idade de diagnóstico da doença de pacientes vivos ou mortos eram estatistiscamente diferentes.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 boxplot(idade_diagnostico ~ status_vital, data = merged_data_clean, 
         main = "Idade de diagnóstico por status vital",
         xlab = "Status vital", ylab = "Idade de diagnóstico")
@@ -239,7 +243,7 @@ Isto sugere que há uma diferença estatisticamente significativa entre as idade
 Em suma, uma simples interpretação dos metadados permite tirar algumas conclusões.
 De modo a juntar a informação relativa ao genero, idade de diagnostico e estado vital decidimos realizar um gráfico de barras que nos permitisse observar nos dois estados vitais possiveis a frequencia de mulheres/homens numa determinda faixa etária relativa ao diagnóstico da patologia em questão.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 dead_data <- subset(merged_data_clean_3, merged_data_clean_3$status_vital == "Dead")
 alive_data <- subset(merged_data_clean_3, merged_data_clean_3$status_vital == "Alive")
 cores <- c("pink", "lightblue")
@@ -264,7 +268,7 @@ Como referido, o nosso dataset tinha 60660 linhas (genes) e portanto seria basta
 A abordagem inicial passou também por defenir uma condição associada aos dados, condição essa que escolhemos a partir de uma coluna dos metadados que identificava um determinado gene como mutante ou wild-type (WT).
 Utilizamos como referência esta coluna, uma vez que, segundo a literatura mutações nos genes que produzem o composto isocitrato desidrogenase (IDH) estão frequentemente associados a cancros, tendo uma associação em 80 % com a patologia em questão [10].
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 data_de <- data_rna_LGG[,!is.na(data_rna_LGG$paper_IDH.status)] 
 ddsSE <- DESeqDataSet(data_de, design = ~ paper_IDH.status)
 ```
@@ -287,7 +291,7 @@ dim(ddsSE_filtrado)
 Após estas etapas de filtragem, conseguimos passar para um dataset com 32648 linhas (genes) e 513 colunas (amostras/pacientes).
 Este foi o ponto de partida para nas etapas seguintes realizar a normalização dos dados associados às mesmas condições já referidas.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 ddsSE_norm <- DESeq(ddsSE_filtrado) 
 resultsNames(ddsSE_norm) 
 res <- results(ddsSE_norm, name = "paper_IDH.status_WT_vs_Mutant") 
@@ -318,7 +322,7 @@ Pela análise dos valores de LFC podemos concluir que temos mais genes mutantes 
 
 A visualização gráfica desse conjunto de genes é dada pelo seguinte código, sendo os genes coloridos a azul os que são diferencialmente expressos e a cinzento os genes que não são.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 plotMA(res, main="Expressão diferencial", ylim=c(-10,10))
 ```
 
@@ -326,7 +330,7 @@ Como é possivel verificar existem muito pontos classificados como diferencialme
 Assim, o objetivo seguinte seria identificar os genes que representam cada um desses pontos.
 Para este objetivo duas estratégias poderiam ser realizadas: i) com exploração do p-value \<0.05, que permitiria rejeitar a hipotese nula onde os genes são igualmente expressos em ambas as condições.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 hist(dea$pvalue, breaks=20,col = "grey", border = "white", xlab = "P-value",
      ylab = "Number of genes", main = "P-value value distribution")
 genes_pvalue_fi <- rownames(res)[which(dea$pvalue < 0.05)]
@@ -338,7 +342,7 @@ Todavia, se assumir que a hipótese nula é verdadeira para todos os genes, é e
 Posto isto, 1632 genes poderiam ser escolhidos como diferencalmente expressos, o que iria equivaler a cerca de 7 % de falsos positivos face ao que foi obtido (1632/23323 \*100).
 Assim, achamos mais apropriado a seguinte estratégia: ii) com a exploração de um padj\<0.01, onde estamos a aceitar ter uma percentagem máxima de 1% de falsos positivos, o que irá peritir uma maior filtragem e continua na mesma a ser uma correta abordagem.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 hist(dea$padj, breaks=20,col = "grey", border = "white", xlab = "P-adj",
      ylab = "Number of genes", main = "P-adj value distribution")
 genes_padj_fi <- rownames(res)[which(dea$padj < 0.01)]
@@ -351,20 +355,20 @@ Com esta nova filtragem obtivemos 20126 genes diferencialmente expressos.
 
 Tendo em conta que temos 20126 genes, um numero bastante elevado mesmo após filtragem, decidimos para primeira abordagem analisar o gene mais diferencialmente expresso, ou seja, cujo valor de p-adj é menor.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 topGene <- rownames(res)[which.min(res$padj)]
 ```
 
 A partir daí e, de modo, a facilitar a interpertação realizamos um gráfico que nos permite ver a dispersão das contagem associadas ao gene mais diferencialmente expresso nas duas condições mutante e wild-type.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 plotCounts(ddsSE_norm, gene = topGene, intgroup=c("paper_IDH.status"))
 ```
 
 A partir do gráfico é possível observar que a maior parte das amostras de pacientes com glioma têm gene mutante e aqueles que têm o gene wild-type, por norma, têm associado valores de maior expressão.
 Esta mesma abordagem foi realizada face às mesmas condições, mutante e wild-type, mas associada também à outra condição clínica, o estado vital do paciente, que é representado com bolas de diferentes cores.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 geneCounts <- plotCounts(ddsSE_norm, gene = topGene, intgroup = c("paper_IDH.status","vital_status"), 
                          returnData = TRUE)
 ggplot(geneCounts, aes(x = paper_IDH.status, y = count, color = vital_status)) + 
@@ -379,7 +383,7 @@ Mutações neste gene já foram identificadas na literatura com associação dir
 Uma boa abordagem para analisar de uma forma mais global, e tendo na mesma em consideração a condição mutante vs wild-type, é através de um heatmap que se consegue identificar padrões ou tendências nos dados.
 Para realizar o heatmap, consideraram-se apenas os 20 genes com maior diferenciação de expressão ( 20 genes com menor p-adj).
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 vsd <- varianceStabilizingTransformation(ddsSE_norm, blind = FALSE)
 resOrdered <- res[order(res$padj),]
 select <- rownames(head(resOrdered,20))
@@ -413,7 +417,7 @@ A análise de enriquecimento é uma técnica utilizada na análise de dados biol
 O objetivo é identificar se um conjunto de genes têm uma função biológica ou uma característica comum que sugere que eles estejam envolvidos em um determinado processo biológico ou que eles sejam regulados por um conjunto comum de fatores de transcrição, por exemplo.
 O que pretendemos é realizar uma análise dos dados de expressão genética em larga escala, na qual os conjuntos de genes diferencialmente expressos serão comparados com as anotações biológicas para identificar as funções biológicas e processos celulares afetados pelas mudanças na expressão.
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 get_entrez <- function(x){
   unlist(strsplit(x, split="[.]+"))[2]
 }
@@ -424,12 +428,12 @@ ann <- select(org.Hs.eg.db,keys=sapply(rownames(res), get_entrez),columns=c("ENT
 head(ann)
 ```
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 all_results.annotated <- cbind(res, ann)
 head(all_results.annotated)
 ```
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 results.ord <- all_results.annotated[ order(-all_results.annotated[,"log2FoldChange"]), ]
 ranks <- results.ord$log2FoldChange
 names(ranks) <- results.ord$ENTREZID
@@ -447,7 +451,7 @@ dim(fgseaRes)
 head(fgseaRes[order(padj), ])
 ```
 
-```{r,message=FALSE}
+```{r,results='hide', warning = FALSE, message=FALSE}
 ggplot(fgseaRes, aes(reorder(pathway, NES), NES)) +
   geom_col(aes(fill=padj<0.05)) +
   coord_flip() +
@@ -472,7 +476,7 @@ Reducao da dimensionalidade tem como objetivo descobrir um conjunto de dados mai
 
 #### PCA
 
-```{r, message=FALSE}
+```{r, results='hide', warning = FALSE, message=FALSE}
 data_rna_LGG_matrix <- as.matrix(assay(ddsSE_norm))
 data_rna_LGG_transposed <- t(data_rna_LGG_matrix)
 
@@ -485,7 +489,7 @@ summary(pcares)
 ```
 
 
-```{r, message=FALSE}
+```{r, results='hide', warning = FALSE, message=FALSE}
 min(which(summary(pcares)$importance[3,]>0.9))
 screeplot(pcares, type = "lines", main = "Variância-pcares")
 ```
@@ -493,7 +497,7 @@ screeplot(pcares, type = "lines", main = "Variância-pcares")
 Depois de colocar o dataset filtrado e normalizado na 1ºParte do trabalho como matriz, realizamos a transposta com o objetivo de analisar a variabilidade entre as amostras, identificando padrões tendo por base a expressão dos genes. Assim, identificamos as componentes principais que explicam 90% da variabilidade das amostras analisadas, tendo obtido um total de 258 PC. Cada PC corresponde a uma combinação linear dos genes, sendo que são ordenadas de acordo com a quantidade de variação que representam onde os primeiro PC estão associados a uma maior variância (como é possivel observar no gráfico Variância-pcares).
 
 
-```{r, message=FALSE}
+```{r, results='hide', warning = FALSE, message=FALSE}
 plot(pcares$x, col = ddsSE_norm$paper_IDH.status, pch = 19)
 legend("topright",legend=levels(ddsSE_norm$paper_IDH.status), col = 1:2, pch=19)
 ```
@@ -511,7 +515,7 @@ Para completar esta secção poderia ser útil identificar quais variaveis (gene
 
 Este algortitmo de redução de dimensionalidade tem o propósito de mapear pontos de alta dimensionalidade para um espaço de menor dimensionalidade preservando as relações de similiariedade entre pontos. Ou seja, os pontos mais semelhantes (por exemplo com expressão genética semelhante) estariam mais próximos uns dos outros e pontos mais diferentes seriam mapeados mais distantes.
 
-```{r, message=FALSE}
+```{r, results='hide', warning = FALSE, message=FALSE}
 data_rna_LGG_matrix <- as.matrix(assay(ddsSE_norm))
 Rtsne(data_rna_LGG_matrix)
 data_rna_LGG_matrix_nd = data_rna_LGG_matrix[!duplicated(data_rna_LGG_matrix),]
@@ -522,10 +526,10 @@ plot(res_tnse$Y, col = ddsSE_norm$paper_IDH.status, pch = 19)
 
 Todavia, pelo gráfico obtido é possivel concluir que este algoritmo para as dimensoes analisadas não é suficiente, ou seja, em termos de redução da dimensionalidade dos dados não é deveras suficiente apenas utilizar esta abordagem.Poderia existir uma justificação para esta sobreposição nomeadamente o facto de os dados seerem naturalmente "inseparaveis" numa análise num espaço de menor dimensão e, como tal , esta dimensionalidade reduzida não ser suficiente para capturar toda a estrutura complexa dos dados.
 
-## 1.2 Clustering 
+### 1.2 Clustering 
 O objetivo do clustering é agrupar dados com base na sua similaridade
 
-### Hierárquico {.tabset}
+#### Hierárquico {.tabset}
 
 Este tipo de agrupamento é feito por probabilidade de pertença, e é uma abordagem aglomerativa que usa a estratégia bottom up, ou seja, há construção de uma árvore que é feita das folhas para a raiz. Os clusters são representados pelos nós. 
 Na análise do cluster hierárquico, a realação de proximidade entre os pontos no espaço multidimensional é dada pela distancia Euclediana, uma métrica bastante utilizada que considera todas as dimensões do espaço. 
@@ -539,14 +543,14 @@ data_rna_LGG_rank = data_rna_LGG_matrix[genes_de_mdr,]
 eucD = dist(data_rna_LGG_rank)
 ```
 
-Após calcular a matriz euclediana , várias formas de calcular a distância entre clusters poderia ser aplicadas, nomeadamente: single linkage, complete linkage ou average linkage. As  3 formas estão codificadas de seguida.
+Após calcular a matriz euclediana, várias formas de calcular a distância entre clusters poderia ser aplicadas, nomeadamente: single linkage, complete linkage ou average linkage. As  3 formas estão codificadas de seguida.
 Além disso poderiamos utilizar duas distintas aboradagens na exploração desta técnica , ou seja, poderiamos agrupar por genes ou agrupar por pacientes.
 
-#### Por genes 
+##### Por genes 
 
 Identificar grupos de genes que têm padrões de expressão semehantes entre os pacientes/amostras. Assim, este agrupamento dá informações sobre a similaridade entre os genes, permitindo identificar genes que são coexpressoes e podem até estar envolvidos em vias metabólicas ou processo semelhante.
 
-```{r: message=FALSE}
+```{r, results='hide', warning = FALSE, message=FALSE}
 tt_mdr_g = rowttests(data_rna_LGG_matrix)
 rank_de_mdr_g = order(tt_mdr_g$p.value)
 genes_de_mdr_g = rank_de_mdr_g[1:30]
@@ -564,17 +568,15 @@ plot(cl.hier2,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 
 #average
 cl.hier3 <- hclust(eucD, method="average")
 plot(cl.hier3,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:average, distância Euclidiana")
-
-
 ```
 
 Fazendo uma análise global dos três métodos de medida de distancia entre clusters analisados podemos concluir que em todos se verifica a presença dos mesmos 30 genes mais diferencialmente expressos. Este aspecto, proporciona confiança nos resultados obtidos, uma vez que, 3 abordagens distintas dão, em suma, a mesma divisão.Além disso, poderiamos dividir estes 30 genes em 3 subgrupos e a partir daí explorar os genes associados.
 
-#### Por pacientes
+##### Por pacientes
 
 Identificar grupos de pacientes que se assemlham com base no perfil de expressão genético. Este agrupamente dá informações sobre a similaridade entre os pacientes ajudando a descobrir grupos de subgrupos de pacientes com perfis de expressao semelhantes.
 
-```{r: message=FALSE}
+```{r, results='hide', warning = FALSE, message=FALSE}
 tt_mdr = rowttests(t(data_rna_LGG_matrix))
 rank_de_mdr = order(tt_mdr$p.value)
 genes_de_mdr = rank_de_mdr[1:30]
@@ -598,11 +600,11 @@ plot(cl.hier3,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 
 
 Fazendo uma análise global dos três métodos de medida de distancia entre clusters analisados podemos concluir que em todos se verifica a presença dos mesmos 30 pacientes com um perfil genético mais diferenciado. Todavia, a escolha de clusters nos tres tipos de aboradagens é mais subjetiva e complicada. Desta forma, não conseguimos garantir uma divisão semelhante em clusters dos 30 pacientes, sendo este um aspecto que poderia causar dificuldade numa futura análise. 
 
-### K-Means
+#### K-Means
 Alternativa é o clustering K-Means. Esta abordagem tenta agrupar os dados de forma a minimizar as distâncias entre os pontos e centróides dos clusters.
 Um método muito utilizado para auxiliar na determinação do número adequado de clusters é o "método do cotovelo". Este método envolve a análise da variação da soma dos quadrados intra-cluster (WSS) em relação ao número de clusters
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
 ofs <- c()
 for (k in 2:10) {
   kmeans <- kmeans(t(data_rna_LGG_matrix), centers = k, nstart = 10)
@@ -621,7 +623,7 @@ Através da observação do gráfico é possivel verificar que o ponto no gráfi
 Partindo desse principio, decidimos aplicar o algoritmo do Kmeans, tendo como referência o valor de 6 centroides, de modo a criar uma tabela que nos permitisse analisar a distribuição dos pacientes nos cluesters em relação ao metadado estudado.
 
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
 resKmeans <- kmeans(t(data_rna_LGG_matrix),centers=6)
 resKmeans
 centroides=resKmeans$cluster
@@ -630,14 +632,14 @@ table_result=table(centroides, ddsSE_filtrado$paper_IDH.status)
 
 Através da interpretação da tabela é possivel verificar que existem clusters que têm uma separação diferenciada no que concerne ao metadado analisado , cumprindo o principal propósito do k-means. Todavia, existem clusters cuja separação não é a ideal e, nós pensamos que esse aspecto poderia ser ultrupassado se por ventura aumentarmos o valor de clusters.
 
-## Análise Supervisionada {.tabset}
+## 2. Análise Supervisionada {.tabset}
 
 Nesta etapa do trabalho o objetivo é fazer previsoes tendo por base os dados existentes, ou seja, prever a classificação  de uma nova amostra.
 Para tal foram treinados e testados 6 modelos: __k-Nearest Neighbors__, __Naive Bayes__, __Random Forest__, __Decision Trees__, __Support Vector Machine__, __Neural Networks__ .
 Contudo, um dos problemas que nos apareceu estava associado a limitação de memoria no R-Studio, ou seja, não estavamos a conseguir trabalhar com um dataset tão extenso. Posto isto, uma alternativa foi trabalhar com os 900 genes com menor padjust e, portanto, os 900 genes mais diferencialmente expressos. Sabemos que poderíamos optar por explorar aqui os resultados do PCA, contudo foi opção nossa utilizar a primeira abordagem.
 
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
 set.seed(16718)
 data_rna_LGG_data <- data.frame(data_rna_LGG_matrix)
 ml_mutants <- as.data.frame(cbind(group = meta_LGG$paper_IDH.status, t(data_rna_LGG_data)))
@@ -662,8 +664,8 @@ table(testData$group)
 
 Além disso foi utilizado uma cross validation com 10 folds repetida 5 vezes. Para tornar estes resultados replicáveis , foi invocado uma seed 16718. Um aspecto que também se teve em consiração foi a diferente proporção entre a classe 1- Mutante e a classe 2 WT, daí se ter utilizado a primeiro bloco  de código descrita abaixo.
 
-```{r}
-#rerpesentação grafica da distribuição da classe 1 e 2
+```{r, results='hide', warning = FALSE, message=FALSE}
+#representação grafica da distribuição da classe 1 e 2
 ml_mutants_selected$group
 frequencia <- table(ml_mutants_na$group)
 cores <- rainbow(length(frequencia))
@@ -690,7 +692,7 @@ best_k
 
 Após treinar o modelo e ter o hiperparametro definido, fomos testar o mesmo com o intuito prever a que classe iria pertencer as amostras agora analisadas.
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
 #teste
 pred_kn_cv <- predict(group_knn_cv, newdata = testData[,1:901])
 ```
@@ -700,7 +702,6 @@ Como parte final e de modo a avaliar o modelo em estudo analisamos as métricas 
 ```{r}
 # Criar a matriz de confusão
 confusion_matrix <- confusionMatrix(pred_kn_cv, testData$group)
-confusion_matrix
 precision <- confusion_matrix$byClass["Pos Pred Value"]
 recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
@@ -721,14 +722,16 @@ Tedo em conta as métricas analisadas queremos salientar a accuracy com 95,36 %,
 ### Naive Bayes
 Para este modelo em particular nao foi avaliado nenhum hiperparametro em especifico , tendo sido apenas treinado o algoritmo de ML em estudo face ao dataset previamente dividido. Este algoritmo baseia-se no teorema de Bayes e na suposição de independencia condicional entre as variaveis.
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
+#treino
 set.seed(16718)
 group_nb_cv <- train(group ~ ., data = trainData[,1:901], method = "nb", trControl = cv.control)
 ```
 
 De seguida, aplicou-se o modelo treinado para prever as classes das amostras presentes no dataset de test.
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
+#teste
 pred_nb_cv <- predict(group_nb_cv, newdata = testData[,1:901])
 ```
 
@@ -737,8 +740,6 @@ O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respet
 ```{r}
 # Criar a matriz de confusão
 confusion_matrix <- confusionMatrix(pred_nb_cv, testData$group)
-
-confusion_matrix
 precision <- confusion_matrix$byClass["Pos Pred Value"]
 recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
@@ -746,11 +747,12 @@ f1_score <- confusion_matrix$byClass["F1"]
 sensitivity <- confusion_matrix$byClass["Sensitivity"]
 
 # Imprimir as métricas
+confusion_matrix
 cat("Precision:", precision, "\n")
 cat("Recall:", recall, "\n")
 cat("Accuracy:", accuracy, "\n")
 cat("F1-score:", f1_score, "\n")
-cat("Sensitivity:", sensitivity, "\n")
+cat("Sensitivity:", sensitivity, "\n")
 ```
 
 Tendo em conta as métricas analisadas queremos salientar a accuracy com 96.69 %.
@@ -758,13 +760,16 @@ Tendo em conta as métricas analisadas queremos salientar a accuracy com 96.69 %
 ### Random Forest
 O algoritmo em questão combina a previsão de várias árvores de decisão para melhorar a precisão e a robustez do modelo, sendo baseado num conceito de "ensemble learning". Exploramos ainda a melhor combinação dos hiperparametros.
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
+#treino
+set.seed(16718)
 group_rf_cv <- train(group ~ ., data = trainData[,1:901], method = "rf", tuneLenght=10, trControl = cv.control)
 ```
 
 O modelo treinado com a melhor combinação dos hiperparametros em questão é depois aplicado para prever as classes no dataset de teste.
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
+#teste
 pred_rf_cv <- predict(group_rf_cv, newdata = testData[,1:901])
 ```
 
@@ -773,7 +778,6 @@ O desempenho deste modelo foi avaliado com auxilio da confusion matrix e respeti
 ```{r}
 # Métricas
 confusion_matrix <- confusionMatrix(pred_rf_cv, testData$group)
-confusion_matrix
 precision <- confusion_matrix$byClass["Pos Pred Value"]
 recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
@@ -781,6 +785,7 @@ f1_score <- confusion_matrix$byClass["F1"]
 sensitivity <- confusion_matrix$byClass["Sensitivity"]
 
 # Imprimir as métricas
+confusion_matrix
 cat("Precision:", precision, "\n")
 cat("Recall:", recall, "\n")
 cat("Accuracy:", accuracy, "\n")
@@ -794,7 +799,8 @@ Tendo em conta as métricas analisadas queremos salientar a accuracy com 98,68 %
 Este algoritmo em particular explora uma estrutura hierárquica semelhante a uma árvore, sendo que as decisões/previsão são tomadas com base em regras de decisão aprendidas durante a etapa de treinamento. Assim cada nó de decisão representa uma condição que é utilizada para dividir os dados em subconjuntos mais especificos.
 Para este algoritmo em particular foram explorados  hiperparametros, nomeadamente, cp. Salientando que o processo de treinamento e realizado tendo em conta esses hiperparametros , em particular, o melhor conjunto dos mesmos.
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
+#teste
 set.seed(16718)
 group_tree_cv <- train(group ~ ., data = trainData[,1:901], method = "rpart", tuneLength = 10, trControl = cv.control)
 # Obter o melhor hiperparâmetro
@@ -806,7 +812,7 @@ final_model <- rpart(group ~ ., data = trainData[,1:901], method = "class", cp =
 
 O modelo treinado é depois aplicado para prever as classes no datasset de teste. 
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
 # Fazer previsões em novos dados
 pred_tree_cv <- predict(final_model, newdata = testData[,1:901], type = "class")
 ```
@@ -816,7 +822,6 @@ O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respet
 ```{r}
 # Métricas
 confusion_matrix <- confusionMatrix(pred_tree_cv, testData$group)
-confusion_matrix
 precision <- confusion_matrix$byClass["Pos Pred Value"]
 recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
@@ -824,6 +829,7 @@ f1_score <- confusion_matrix$byClass["F1"]
 sensitivity <- confusion_matrix$byClass["Sensitivity"]
 
 # Imprimir as métricas
+confusion_matrix
 cat("Precision:", precision, "\n")
 cat("Recall:", recall, "\n")
 cat("Accuracy:", accuracy, "\n")
@@ -836,22 +842,21 @@ Tendo em conta as métricas analisadas queremos salientar a accuracy com 96.69 %
 ### SVM
 O algortitmo em estudo tem como objetivo principal encontrar o hiperplano de separação ótimo que maximiza a separação entre as classes. Assim, de modo a explorar melhor este algoritmo foram explorados a melhor combinação dos seguintes hiperparametros: sigma e C.
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
+#treino
 set.seed(16718)
-group_svm_cv <- train(group ~ ., 
-                      data = trainData[, 1:901], 
-                      method = "svmRadial", 
+group_svm_cv <- train(group ~ ., data = trainData[, 1:901], method = "svmRadial", 
                       tuneGrid = expand.grid(sigma = c(0.1, 0.2, 0.3), C = c(1, 10, 100)),
                       trControl = cv.control)
 
 best_sigma <- group_svm_cv$bestTune$sigma
 best_C <- group_svm_cv$bestTune$C
-
 ```
 
 O modelo treinado com a melhor combinação dos hiperparametros em questão é depois aplicado para prever as classes no dataset de teste. 
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
+#teste
 pred_svm_cv <- predict(group_svm_cv, newdata = testData[,1:901])
 ```
 
@@ -860,7 +865,7 @@ O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respet
 ```{r}
 # Métricas
 confusion_matrix <- confusionMatrix(pred_svm_cv, testData$group)
-confusion_matrix
+
 precision <- confusion_matrix$byClass["Pos Pred Value"]
 recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
@@ -868,6 +873,7 @@ f1_score <- confusion_matrix$byClass["F1"]
 sensitivity <- confusion_matrix$byClass["Sensitivity"]
 
 # Imprimir as métricas
+confusion_matrix
 cat("Precision:", precision, "\n")
 cat("Recall:", recall, "\n")
 cat("Accuracy:", accuracy, "\n")
@@ -880,14 +886,16 @@ Tendo em conta as métricas analisadas queremos salientar a accuracy com 82,78 %
 ### Neural Networks
 Este algoritmo já se encontra associado ao deep learning, sendo que tem como inspiração o funcionamento do cerebro humano. Em suma explora unidades interconectadas( unidade de processamento) que são organizadas em camadas. Os  hiperparametros tambem foram avaliados.
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
+#treino
 set.seed(16718)
 group_nn_cv = train(group~., data = trainData[, 1:901], method = "nnet", tuneLenght=10, trControl=cv.control, maxit = 100,)
 ```
 
 O modelo treinado com a melhor combinação dos hiperparametros em questão é depois aplicado para prever as classes no dataset de teste.
 
-```{r}
+```{r, results='hide', warning = FALSE, message=FALSE}
+#teste
 pred_nn_cv <- predict(group_nn_cv, newdata = testData[, 1:901])
 ```
 
@@ -896,7 +904,7 @@ O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respet
 ```{r}
 #métricas
 confusion_matrix <- confusionMatrix(pred_nn_cv, testData$group)
-confusion_matrix
+
 precision <- confusion_matrix$byClass["Pos Pred Value"]
 recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
@@ -904,6 +912,7 @@ f1_score <- confusion_matrix$byClass["F1"]
 sensitivity <- confusion_matrix$byClass["Sensitivity"]
 
 # Imprimir as métricas
+confusion_matrix
 cat("Precision:", precision, "\n")
 cat("Recall:", recall, "\n")
 cat("Accuracy:", accuracy, "\n")
@@ -913,11 +922,11 @@ cat("Sensitivity:", sensitivity, "\n")
 
 Tendo em conta as métricas analisadas queremos salientar a accuracy com 96,03 %.
 
-## Melhor modelo
+## 2.1 Melhor modelo
 
 Após observação da accuracy dos 6 modelos para a classificação da classe mutante ou wild type do composto isocitrato desidrogenase (IDH), selecionou-se o modelo obtido a partir do algoritmo de “Random Forest” como aquele com maior accuracy entre os restantes, tomando esta o valor de \(98,68\%\).
 
-## Importância das variaveis
+## 2.2 Importância das variáveis
 
 Por último, foi realizada a seleção de atributos para o dataset considerado para machine learning, através do método de Recursive Feature Elimination. Este algoritmo foi implementado com uma estimação do erro correspondente a validação cruzada 10 folds.
 Através do argumento “sizes”, foi dado ao algoritmo o tamanho das amostragens de variáveis a testar.
@@ -935,7 +944,7 @@ Sendo que decidimos util confirmar o que foi obtido com a informação descrita 
 A base de dados "The humam protein Atlas" confirma que esses tres genes estão associados ao glioma
 
 
-## Bibliografia
+# Bibliografia
 1. Haddad, A.F., Young, J.S., Oh, J.Y., Okada, H., Aghi, M.K.: The immunology of low-grade gliomas. Neurosurg. Focus. 52, E2 (2022). https://doi.org/10.3171/2021.11.FOCUS21587.
 
 2. Bale, T.A., Rosenblum, M.K.: The 2021 WHO Classification of Tumors of the Central Nervous System: An update on pediatric low-grade gliomas and glioneuronal tumors. Brain Pathol. 32, e13060 (2022). https://doi.org/10.1111/bpa.13060.
@@ -954,5 +963,5 @@ A base de dados "The humam protein Atlas" confirma que esses tres genes estão a
 
 9. Xin, J., Zheng, L. M., Sun, D. K., Li, X. F., Xu, P., &amp; Tian, L. Q. (2018). Mir‑204 functions as a tumor suppressor gene, at least partly by suppressing CYP27A1 in glioblastoma. Oncology Letters. https://doi.org/10.3892/ol.2018.8846 
 
-10.Pirozzi, C.J., Yan, H. The implications of IDH mutations for cancer development and therapy. Nat Rev Clin Oncol 18, 645–661 (2021). https://doi.org/10.1038/s41571-021-00521-0 
+10. Pirozzi, C.J., Yan, H. The implications of IDH mutations for cancer development and therapy. Nat Rev Clin Oncol 18, 645–661 (2021). https://doi.org/10.1038/s41571-021-00521-0 
 
