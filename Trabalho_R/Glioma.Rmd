@@ -144,7 +144,7 @@ dim(metadata_matriz_clean)
 Após esta filtragem obteve-se 78 colunas. Sabemos que, seria possível filtrar ainda mais, contudo nesta fase inicial, apenas eliminamos essas colunas.
 Para iniciar a análise, verificou-se a descrição sumária das colunas resultantes.
 
-```{r, warning = FALSE, message=FALSE}
+```{r,results='hide',warning = FALSE, message=FALSE}
 metadados_teste=as.data.frame(metadata_matriz_clean)
 summary(metadados_teste)
 ```
@@ -307,13 +307,11 @@ dim(ddsSE_filtrado)
 Após estas etapas de filtragem, conseguimos passar para um dataset com 32648 linhas (genes) e 513 colunas (amostras/pacientes).
 Este foi o ponto de partida para nas etapas seguintes realizar a normalização dos dados associados às mesmas condições já referidas.
 
-```{r, warning = FALSE, message=FALSE}
+```{r,  results='hide', warning = FALSE, message=FALSE}
 ddsSE_norm <- DESeq(ddsSE_filtrado) 
 resultsNames(ddsSE_norm) 
 res <- results(ddsSE_norm, name = "paper_IDH.status_WT_vs_Mutant")
-res
 dea <- as.data.frame(res)
-dea
 ```
 
 ```{r}
@@ -341,6 +339,7 @@ Pela análise dos valores de LFC podemos concluir que temos mais genes mutantes 
 A visualização gráfica desse conjunto de genes é dada pelo seguinte código, sendo os genes coloridos a azul os que são diferencialmente expressos e a cinzento os genes que não são.
 
 ```{r, warning = FALSE, message=FALSE}
+library(DESeq2)
 plotMA(res, main="Expressão diferencial", ylim=c(-10,10))
 ```
 
@@ -733,11 +732,11 @@ Como parte final e de modo a avaliar o modelo em estudo analisamos as métricas 
 ```{r}
 # Criar a matriz de confusão
 confusion_matrix <- confusionMatrix(pred_kn_cv, testData$group)
-precision <- confusion_matrix$byClass["1","Pos Pred Value"]
-recall <- confusion_matrix$byClass["1","Sensitivity"]
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
-f1_score <- confusion_matrix$byClass["1","F1"]
-sensitivity <- confusion_matrix$byClass["1","Sensitivity"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
 
 # Imprimir as métricas
 confusion_matrix
@@ -773,11 +772,11 @@ O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respet
 ```{r}
 # Criar a matriz de confusão
 confusion_matrix <- confusionMatrix(pred_nb_cv, testData$group)
-precision <- confusion_matrix$byClass["1","Pos Pred Value"]
-recall <- confusion_matrix$byClass["1","Sensitivity"]
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
-f1_score <- confusion_matrix$byClass["1","F1"]
-sensitivity <- confusion_matrix$byClass["1","Sensitivity"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
 
 # Imprimir as métricas
 confusion_matrix
@@ -788,7 +787,7 @@ cat("F1-score:", f1_score, "\n")
 cat("Sensitivity:", sensitivity, "\n")
 ```
 
-Tendo em conta as métricas analisadas queremos salientar a accuracy com 81,38 %.
+Tendo em conta as métricas analisadas queremos salientar a accuracy com 96,69 %.
 
 ### Random Forest
 
@@ -813,11 +812,11 @@ O desempenho deste modelo foi avaliado com auxilio da confusion matrix e respeti
 ```{r}
 # Métricas
 confusion_matrix <- confusionMatrix(pred_rf_cv, testData$group)
-precision <- confusion_matrix$byClass["1","Pos Pred Value"]
-recall <- confusion_matrix$byClass["1","Sensitivity"]
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
-f1_score <- confusion_matrix$byClass["1","F1"]
-sensitivity <- confusion_matrix$byClass["1","Sensitivity"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
 
 # Imprimir as métricas
 confusion_matrix
@@ -858,11 +857,11 @@ O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respet
 ```{r}
 # Métricas
 confusion_matrix <- confusionMatrix(pred_tree_cv, testData$group)
-precision <- confusion_matrix$byClass["1","Pos Pred Value"]
-recall <- confusion_matrix$byClass["1","Sensitivity"]
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
-f1_score <- confusion_matrix$byClass["1","F1"]
-sensitivity <- confusion_matrix$byClass["1","Sensitivity"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
 
 # Imprimir as métricas
 confusion_matrix
@@ -904,11 +903,11 @@ O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respet
 # Métricas
 confusion_matrix <- confusionMatrix(pred_svm_cv, testData$group)
 
-precision <- confusion_matrix$byClass["1","Pos Pred Value"]
-recall <- confusion_matrix$byClass["1","Sensitivity"]
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
-f1_score <- confusion_matrix$byClass["1","F1"]
-sensitivity <- confusion_matrix$byClass["1","Sensitivity"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
 
 # Imprimir as métricas
 confusion_matrix
@@ -923,6 +922,7 @@ Tendo em conta as métricas analisadas queremos salientar a accuracy com 82,78 %
 
 ### Neural Networks
 Este algoritmo já se encontra associado ao deep learning, sendo que tem como inspiração o funcionamento do cerebro humano. Em suma explora unidades interconectadas( unidade de processamento) que são organizadas em camadas. Os  hiperparametros tambem foram avaliados.
+
 
 ```{r, results='hide', warning = FALSE, message=FALSE}
 #treino
@@ -944,11 +944,11 @@ O desempenho deste modelo foi avalidado com auxilio da confusion matrix e respet
 #métricas
 confusion_matrix <- confusionMatrix(pred_nn_cv, testData$group)
 
-precision <- confusion_matrix$byClass["1","Pos Pred Value"]
-recall <- confusion_matrix$byClass["1","Sensitivity"]
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
 accuracy <- confusion_matrix$overall["Accuracy"]
-f1_score <- confusion_matrix$byClass["1","F1"]
-sensitivity <- confusion_matrix$byClass["1","Sensitivity"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
 
 # Imprimir as métricas
 confusion_matrix
@@ -963,7 +963,9 @@ Tendo em conta as métricas analisadas queremos salientar a accuracy com 96,03 %
 
 ## 2.1 Melhor modelo
 
-Após observação da accuracy dos 6 modelos para a classificação da classe mutante ou wild type do composto isocitrato desidrogenase (IDH), selecionou-se o modelo obtido a partir do algoritmo de “Random Forest” como aquele com maior accuracy entre os restantes, tomando esta o valor de \(98,68\%\).
+Após observação da accuracy dos 6 modelos para a classificação da classe mutante ou wild type do composto isocitrato desidrogenase (IDH), selecionou-se o modelo obtido a partir do algoritmo de “Random Forest” como aquele com maior accuracy entre os restantes, tomando este o valor de \(98,68\%\).
+
+Saliente-se que após o knit, não se garantem os mesmos resultados no html que foram obtidos no script do R. A análise feita na etapa seguinte foi feita consoante os resultados obtidos no script e não o que poderá vir a dar na versão do html.
 
 ## 2.2 Importância das variáveis
 
@@ -980,7 +982,7 @@ results
 
 Assim, foi determinado que dos \(900\) genes fornecidos, \(40\) permitiam uma melhor precisão do algoritmo.
 Sendo que decidimos util confirmar o que foi obtido com a informação descrita na literatura para 3 dos top 5 genes dados:   __ENSG00000161798.7__, __ENSG00000215612.8__ e __ENSG00000179299.17__ .
-A base de dados "The humam protein Atlas" confirma que esses tres genes estão associados ao glioma
+A base de dados "The humam protein Atlas" confirma que esses tres genes estão associados ao glioma.
 
 
 # Bibliografia
