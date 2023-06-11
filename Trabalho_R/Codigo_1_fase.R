@@ -1,15 +1,34 @@
 #Packages usados:
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("TCGAbiolinks")
+BiocManager::install("genefilter")
+BiocManager::install("fgsea")
+BiocManager::install("limma")
+BiocManager::install("factoextra")
+install.packages("xfun")
+install.packages("SummarizedExperiment") 
+install.packages("factoextra")
+install.packages("Rtsne")
+install.packages("EBImage")
+BiocManager::install("EBImage")
 
+library("DESeq2")
 library("TCGAbiolinks")
 library("Biobase")
 library("DESeq2")
 library("ggbeeswarm")
-library("genefilter")
 library("pheatmap")
 library("org.Hs.eg.db")
 library("fgsea")
 library("ggplot2")
-
+library("factoextra")
+library("limma")
+library("genefilter")
+library("SummarizedExperiment")
+library("factoextra")
+library("Rtsne")
+library("EBImage")
 #ObtenC'C#o dos dados
 
 query_LGG <- GDCquery(project = "TCGA-LGG", 
@@ -20,16 +39,21 @@ query_LGG <- GDCquery(project = "TCGA-LGG",
 #GDCdownload(query_LGG)
 
 data_rna_LGG <- GDCprepare(query_LGG, summarizedExperiment = TRUE, save = TRUE, save.filename = "TCGA_LGG.rda")
+
 load("TCGA_LGG.rda")
 
 class(data_rna_LGG)
+str(data_rna_LGG, give.attr=FALSE)
+
 dim(data_rna_LGG)
 names(data_rna_LGG)
 colnames(data_rna_LGG)
-
-
+str(data_rna_LGG,give.attr=FALSE)
+summary(data_rna_LGG)
 meta_LGG = colData(data_rna_LGG)
 dim(meta_LGG)
+colnames(meta_LGG)
+
 
 
 #Metadados e sua anC!lise descritiva
@@ -136,23 +160,30 @@ barplot(cbind(tabela_dead, tabela_alive), beside = TRUE, col = cores,
 
 
 #Dados e sua filtragem
+sum(is.na(data_rna_LGG))
+teste_h <- DESeqDataSetFromMatrix(countData = assay(data_rna_LGG), colData = colData(data_rna_LGG), design = ~ 1)
+teste_h <- DESeq(teste_h)
+res_t <- results(teste_h)
+summary(res_t)
+normalized_counts <- counts(teste_h)
+mean_value <- mean(normalized_counts[1, ])
+normali
 
-data_de <- data_rna_LGG[,!is.na(data_rna_LGG$paper_IDH.status)] 
+data_de <- data_rna_LGG[,!is.na(data_rna_LGG$paper_IDH.status)] #filtragem das amostras
 
 ddsSE <- DESeqDataSet(data_de, design = ~ paper_IDH.status)
 
-keep <- which(rowSums(counts(ddsSE) >= 10) >= 3) 
+keep <- which(rowSums(counts(ddsSE) >= 10) >= 3) #filtragem tendo em conta uma contagem minima
 
 ddsSE_filtrado <- ddsSE[keep, ] 
+dim(ddsSE_filtrado)
 
-ddsSE_norm <- DESeq(ddsSE_filtrado) 
-
+ddsSE_norm <- DESeq(ddsSE_filtrado)
 resultsNames(ddsSE_norm)
-
 res <- results(ddsSE_norm, name = "paper_IDH.status_WT_vs_Mutant") 
-
 dea <- as.data.frame(res)
-
+summary(dea)
+desvio_padrao <- apply(dea, 1, sd)
 mcols(res, use.names = TRUE)
 
 summary(res)
@@ -173,6 +204,7 @@ genes_padj_fi <- rownames(res)[which(dea$padj < 0.01)]
 
 padj_fi= sum(dea$padj < 0.01, na.rm=TRUE)
 
+dim(genes_padj_fi)
 #AnC!lise da expressC#o diferencial:
 
 
@@ -217,7 +249,9 @@ ranks <- results.ord$log2FoldChange
 
 names(ranks) <- results.ord$ENTREZID
 
-pathways <- gmtPathways("C:/Users/rodri/OneDrive/Documentos/h.all.v7.4.entrez.gmt")
+##pathways <- gmtPathways("C:/Users/rodri/OneDrive/Documentos/h.all.v7.4.entrez.gmt")
+###pathways <- gmtPathways("C:/Users/Karyna/Desktop/Github/Extracao_de_Dados/Trabalho_R/h.all.v7.4.entrez.gmt")
+pathways <- gmtPathways("C:/Users/guilh/OneDrive/Documentos/GitHub/Extracao_de_Dados/Trabalho_R/h.all.v7.4.entrez.gmt")
 
 fgseaRes <- fgsea(pathways, ranks)
 
@@ -226,7 +260,487 @@ dim(fgseaRes)
 head(fgseaRes[order(padj), ])
 
 ggplot(fgseaRes, aes(reorder(pathway, NES), NES)) +
-  geom_col(aes(fill=padj<0.01)) +
+  geom_col(aes(fill=padj<0.05)) +
   coord_flip() +
   labs(x="Pathway", y="Normalized Enrichment Score",
        title="Hallmark pathways NES from GSEA")
+
+#Clustering e outros métodos não supervisionados
+
+##Redução de dimensionalidade
+
+##PCA
+
+###A reduçção de dimensionalidade pode ser uma estratégia para determiar o número de genes que representam uma certa parte da variação do modelo.
+dim (ddsSE_norm)
+data_rna_LGG_matrix <- as.matrix(assay(ddsSE_norm))
+
+# Transpor a matriz
+data_rna_LGG_transposed <- t(data_rna_LGG_matrix)
+dim(data_rna_LGG_transposed)
+# Realizar o PCA
+pcares <- prcomp(data_rna_LGG_transposed, scale. = TRUE)
+
+# Verificar os desvios padrão dos componentes principais
+loadings=pcares$rotation
+
+# Resumo estatístico dos componentes principais
+summary(pcares)
+
+# Gráfico da variância explicada pelo PCA
+screeplot(pcares, type = "lines", main = "Variância-pcares")
+plot(1:length(pcares$sdev), pcares$sdev^2, type = "line", xlab = "Componentes Principais", ylab = "Variância", main = "Variância-pcares")
+
+# Adicionar legendas nos eixos
+xlab("Componentes Principais")
+ylab("Variância Explicada (%)")
+
+min(which(summary(pcares)$importance[3,]>0.90))
+var_total <- sum(pcares$sdev^2)
+soma_variancias <- sum(head(pcares$sdev^2, 100))
+
+cumulative_variance <- cumsum(variance)
+ summary(pcares$rotation[,1:2])
+
+###Foi realizada também uma análise de componentes principais (PCA) sobre estes dados de forma a visualizar os dados e efetuar uma redução de dimensionalidade. Os dados já se encontravam normalizados, e do PCA temos que a primeira dimensão agrega 20.7% da variabilidade da amostra, a segunda dimensão 6.9% e a terceira dimensão 3.6%, perfazendo um total de cerca de 31,2% de variabilidade cumulativa. Para perfazer mais de 90% da variabilidade total do dataset, seria necessário acumular 3 componentes.
+plot(pcares$x, col = ddsSE_norm$paper_IDH.status, pch = 19)
+legend("topright",legend=levels(ddsSE_norm$paper_IDH.status), col = 1:2, pch=19)
+plot(pcares)
+plot(pcares2)
+
+library(scatterplot3d)
+factor <- as.factor(ddsSE_norm$paper_IDH.status)
+
+scatterplot3d(pcares$x[, 1], pcares$x[, 2], pcares$x[, 3], color = levels(factor),
+              pch = 19, xlab = "PC1", ylab = "PC2", zlab = "PC3")
+install.packages("factoextra")
+library("factoextra")
+
+fviz_famd_ind(pcares, geom = c("point"), col.ind = "cos2", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+              palette = "rainbow", addEllipses = FALSE, ellipse.type = "confidence",
+              ggtheme = theme_minimal(), repel = TRUE, labels = F)  
+#tsne
+
+
+data_rna_LGG_matrix <- as.matrix(assay(ddsSE_norm))
+data_rna_LGG_transposed <- t(data_rna_LGG_matrix)
+Rtsne(data_rna_LGG_transposed)
+data_rna_LGG_matrix_nd = data_rna_LGG_transposed[!duplicated(data_rna_LGG_transposed),]
+dim(data_rna_LGG_matrix_nd)
+res_tnse = Rtsne(data_rna_LGG_matrix_nd)
+plot(res_tnse$Y, col = ddsSE_norm$paper_IDH.status, pch = 19)
+install.packages("rgl")
+#mds
+iris.sc = scale(assay(ddsSE_norm))
+dist.iris = dist(iris.sc, method = "euclidean")
+cmd.mds <- cmdscale(dist.iris, 3, eig = TRUE)
+var.pc1 = sum(cmd.mds$eig[1])/sum(abs(cmd.mds$eig)) * 100
+var.pc2 = sum(cmd.mds$eig[2])/sum(abs(cmd.mds$eig)) * 100
+var.pc3 = sum(cmd.mds$eig[3])/sum(abs(cmd.mds$eig)) * 100
+par(mfrow = c(1,1))
+plot(cmd.mds$points[,c(1,2)],xlab=lab.pc1,ylab=lab.pc2,main="")
+
+### Ao observar as linhagens representadas graficamente ao longo dos primeiro e segundo componentes, temos que ao colorir as linhagens pela sua qualidade de representação “cos2” que as linhagens mais próximas do 0 são aquelas cuja variação se encontra menos explicada pelos dois componenetes representados, enquanto que aquelas mais distantes ao longo do primeiro e segundo eixo são aquelas que se encontram melhor diferenciadas.
+
+##Clustering Hierárquico
+#por paciente##################################################
+tt_mdr = rowttests(t(data_rna_LGG_matrix))
+rank_de_mdr = order(tt_mdr$p.value)
+genes_de_mdr = rank_de_mdr[1:30]
+data_rna_LGG_rank = data_rna_LGG_transposed[genes_de_mdr,]
+
+eucD = dist(data_rna_LGG_rank)
+eucD
+###complete
+cl.hier <- hclust(eucD)
+plot(cl.hier,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:complete, distância Euclidiana")
+
+###single
+cl.hier2 <- hclust(eucD, method="single")
+plot(cl.hier2,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:single, distância Euclidiana")
+
+###average
+cl.hier3 <- hclust(eucD, method="average")
+plot(cl.hier3,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 pacientes com menor p-value \nmétodo:average, distância Euclidiana")
+
+heatmap(data_rna_LGG_rank, labCol = F, main="Expressão dos 30 pacientes com menor p-value")
+
+#por genes##################################################
+tt_mdr_g = rowttests(data_rna_LGG_matrix)
+rank_de_mdr_g = order(tt_mdr_g$p.value)
+genes_de_mdr_g = rank_de_mdr_g[1:30]
+data_rna_LGG_rank = data_rna_LGG_matrix[genes_de_mdr,]
+
+eucD = dist(data_rna_LGG_rank)
+
+###complete
+cl.hier <- hclust(eucD)
+plot(cl.hier,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:complete, distância Euclidiana")
+
+###single
+cl.hier2 <- hclust(eucD, method="single")
+plot(cl.hier2,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:single, distância Euclidiana")
+
+###average
+cl.hier3 <- hclust(eucD, method="average")
+plot(cl.hier3,xlab="", ylab="Distância", main="Dendograma da expressão dos 30 genes com menor p-value \nmétodo:average, distância Euclidiana")
+
+heatmap(data_rna_LGG_rank, labCol = F, main="Expressão dos 30 genes com menor p-value")
+
+### Escolher um metadado para fazer comparações?? (não tenho a certeza disto)
+
+##k-means clustering
+
+### optimal number of clusters 
+
+
+fviz_nbclust(t(data_rna_LGG_matrix), kmeans, method = "silhouette")
+
+##Para efetuar o clustering por k-means, de forma a efetuar uma classificação dos grupos observados no PCA, foi primeiro realizada uma siluette analysis sobre os dados logaritmizados com recurso a função fviz_nbclust, que nos indicou que a solução ótima residia em 2 clusters.
+
+### Map of predicted clusters
+install.packages("heatmaply")
+library(heatmaply)
+
+resKmeans <- kmeans(t(data_rna_LGG_matrix),centers=6)
+resKmeans
+centroides=resKmeans$cluster
+table_result=table(centroides, ddsSE_filtrado$paper_IDH.status)
+#plot(data_rna_LGG_transposed[,1],ddsSE_norm$paper_IDH.status, col = resKmeans$cluster, pch = 16)
+library(ggplot2)
+library(cluster)
+#cotovelo
+ofs <- c()
+
+for (k in 2:10) {
+  kmeans <- kmeans(t(data_rna_LGG_matrix), centers = k, nstart = 10)
+  ofs <- c(ofs, kmeans$tot.withinss)
+}
+
+plot_data <- data.frame(num_clusters = 2:10, wss = ofs)
+
+ggplot(plot_data, aes(x = num_clusters, y = wss)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Num Clusters", y = "WSS") +
+  theme_minimal()
+
+
+
+
+# Adicionar legendas aos pontos
+legend("topright", legend = 1:3, col = 1:3, pch = 8, cex = 1.2)
+
+# Adicionar título e rótulos dos eixos
+title("Gráfico de Clusters - K-means")
+xlabel <- "Variável X"
+ylabel <- "Variável Y"
+xlab(xlabel)
+ylab(ylabel)
+
+#não consegui fazer o gráfico dos clusters k-mean porque está a faltar um metadado
+
+#Análise supervisionada (Machine Learning)
+#parece tudo bem- temos divisao data treino e teste
+#classe 1 e 2 
+#temos gráfico para mostrar a distribuição destas classe
+set.seed(16718)
+data_rna_LGG_data <- data.frame(data_rna_LGG_matrix)
+ml_mutants <- as.data.frame(cbind(group = meta_LGG$paper_IDH.status, t(data_rna_LGG_data)))
+ml_mutants_na <- na.omit(ml_mutants)
+dim(ml_mutants_na)
+ml_mutants_na$group = as.factor(ml_mutants_na$group)
+ml_mutants_na$group
+select_genee <- rownames(head(resOrdered,16000)) #top 16000 pelo p-adjust
+
+# Crie um novo dataframe apenas com os genes selecionados
+ml_mutants_selected <- ml_mutants_na[, c("group", select_genee)]
+
+ml_mutants_selected$group
+frequencia <- table(ml_mutants_na$group)
+cores <- rainbow(length(frequencia))
+pie(frequencia, col = cores)
+# 1= MUTANT   2= WT
+#Percentagem de exemplos corretamente classificados
+pecc = function(obs,pred) sum(obs==pred)/length(obs)
+
+# Raízquadradadamédiadoquadradodoserro
+rmse = function(obs, pred) sqrt(mean((obs-pred)^2)) 
+
+# Médiadosdesviosabsolutos
+mad = function(obs, pred) mean(abs(obs-pred))
+
+#Divisão em train e test em 70%, 30%
+ind = sample(2, nrow(ml_mutants_selected), replace=TRUE, prob=c(0.7, 0.3)) 
+trainData = ml_mutants_selected[ind==1,]
+testData = ml_mutants_selected[ind==2,]
+dim(trainData)
+dim(testData)
+table(trainData$group)
+table(testData$group)
+##############################################################
+#Todavia isso nao garante a preservação das proporções das classe no treino e test
+install.packages("rsample")
+library(class)
+library(e1071)
+library(party)
+library(rpart)
+library(caret) 
+library(rsample)
+
+set.seed(16718)
+# Criar as dobras estratificadas usando o pacote rsample
+folds <- rsample::vfold_cv(ml_mutants_selected, strata = "group", v = 10)
+
+# Configurar o objeto trainControl com as dobras estratificadas
+cv.control <- trainControl(method = "repeatedcv", number = 10, repeats = 5, index = folds$split)
+
+# Executar o treinamento usando o trainControl modificado
+#KNN###################
+
+# Executar o treinamento usando o trainControl modificado
+set.seed(16718)
+group_knn_cv <- train(group ~ ., data = trainData[,1:901], method = "knn", tuneGrid = expand.grid(k = 1:10), trControl = cv.control)
+best_k <- group_knn_cv$bestTune$k
+
+pred_kn_cv <- predict(group_knn_cv, newdata = testData[,1:901])
+
+# Criar a matriz de confusão
+confusion_matrix <- confusionMatrix(pred_kn_cv, testData$group)
+confusion_matrix
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity,"\n")
+######################################################
+#naive bayes
+set.seed(16718)
+group_nb_cv <- train(group ~ ., data = trainData[,1:901], method = "nb", trControl = cv.control)
+pred_nb_cv <- predict(group_nb_cv, newdata = testData[,1:901])
+
+# Criar a matriz de confusão
+confusion_matrix <- confusionMatrix(pred_nb_cv, testData$group)
+
+confusion_matrix
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+#####################################################
+# Decision Trees
+# Decision Trees##############################
+set.seed(16718)
+library(rpart)
+# Treinar o modelo usando cross-validation
+group_tree_cv <- train(group ~ ., data = trainData[,1:901], method = "rpart", tuneLength = 10, trControl = cv.control)
+
+# Obter o melhor hiperparâmetro
+best_cp <- group_tree_cv$bestTune$cp
+
+# Treinar o modelo final com o melhor hiperparâmetro
+final_model <- rpart(group ~ ., data = trainData[,1:901], method = "class", cp = best_cp)
+
+# Fazer previsões em novos dados
+pred_tree_cv <- predict(final_model, newdata = testData[,1:901], type = "class")
+
+# Métricas
+confusion_matrix <- confusionMatrix(pred_tree_cv, testData$group)
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+#######################################################
+#SVM
+set.seed(16718)
+group_svm_cv <- train(group ~ ., 
+                      data = trainData[, 1:901], 
+                      method = "svmRadial", 
+                      tuneGrid = expand.grid(sigma = c(0.1, 0.2, 0.3), C = c(1, 10, 100)),
+                      trControl = cv.control)
+
+best_sigma <- group_svm_cv$bestTune$sigma
+best_C <- group_svm_cv$bestTune$C
+
+pred_svm_cv <- predict(group_svm_cv, newdata = testData[,1:901])
+
+# Métricas
+confusion_matrix <- confusionMatrix(pred_svm_cv, testData$group)
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+#########################################################################
+#Random Forest
+set.seed(16718)
+# Treinar o modelo usando cross-validation
+group_rf_cv <- train(group ~ ., data = trainData[,1:901], method = "rf", tuneLenght=10, trControl = cv.control)
+
+# Obter os melhores hiperparâmetros
+best_mtry <- group_rf_cv$bestTune$mtry
+best_ntree <- group_rf_cv$bestTune$ntree
+
+
+# Fazer previsões em novos dados
+pred_rf_cv <- predict(group_rf_cv, newdata = testData[,1:901])
+
+# Métricas
+confusion_matrix <- confusionMatrix(pred_rf_cv, testData$group)
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+##########################################################33
+# Neural networks ###################################
+library(nnet)
+
+set.seed(16718)
+
+# Train the neural network
+
+group_nn_cv = train(group~., data = trainData[, 1:901], method = "nnet", tuneLenght=10, trControl=cv.control, maxit = 100,)
+
+# Retrieve the best parameters
+best_size <- group_nn_cv$bestTune$size
+best_decay <- group_nn_cv$bestTune$decay
+
+# Make predictions using the trained neural network
+pred_nn_cv <- predict(group_nn_cv, newdata = testData[, 1:901])
+
+#métricas
+confusion_matrix <- confusionMatrix(pred_nn_cv, testData$group)
+confusion_matrix
+precision <- confusion_matrix$byClass["Pos Pred Value"]
+recall <- confusion_matrix$byClass["Sensitivity"]
+accuracy <- confusion_matrix$overall["Accuracy"]
+f1_score <- confusion_matrix$byClass["F1"]
+sensitivity <- confusion_matrix$byClass["Sensitivity"]
+
+# Imprimir as métricas
+cat("Precision:", precision, "\n")
+cat("Recall:", recall, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("F1-score:", f1_score, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+################################################################3
+#decsoberta das features mais importantes
+
+#Importância de variáveis
+set.seed(16718)
+control <- rfeControl(functions=rfFuncs, method="cv", number=10)
+ml_mutants_selected= ml_mutants_selected[,1:901]
+results <- rfe(group~., data = ml_mutants_selected, rfeControl=control, sizes=c(1:10,20,40,60,80,100))
+results
+
+#k-Nearest Neighbors -Rodrigo
+
+library(class)
+library(e1071)
+library(party)
+ml_mutants_na_ctree <- ctree(group ~., data=trainData[,1:4])
+print(ml_mutants_na_ctree)
+
+plot(ml_mutants_na_ctree)
+
+testPred <- predict(ml_mutants_na_ctree, testData)
+testPred
+
+table(testPred, testData$group)
+
+pecc(testData$group, testPred) #0.8216561
+
+#Regression Trees
+library(class)
+library(e1071)
+library(party)
+library(rpart)
+arvreg = rpart(group ~., data = trainData[,1:4])
+plot(arvreg)
+text(arvreg)
+val_prev = predict(arvreg, testData)
+val_prev
+
+#não consigo fazer o que está em baixo porque a nossa variavel é qualitiativa e não quantitativa (eu acho)
+rmse(val_prev, testData$group)
+mad(val_prev, testData$group)
+
+### Modelos funcionais lineares
+
+#Regressão usando PLS
+
+#não consigo correr isto porque estou a ter problemas com o package, mas penso que esteja bem
+library(class)
+library(e1071)
+library(party)
+library(rpart)
+library(caret) 
+pls.ml_mutants_na= plsda(trainData[,1:4], trainData[,5]) 
+pred.pls.ml_mutants_na = predict(pls.ml_mutants_na, testData[1:4]) 
+pecc(pred.pls.ml_mutants_na, testData$group)
+
+table(pred.pls.ml_mutants_na, testData$group)
+
+#Análise discriminante
+
+library(MASS)
+lda.model = lda(group ~., trainData[,1:4])
+lda.model
+
+test.lda = predict(lda.model, testData) 
+test.lda$class
+
+pecc(test.lda$class, testData$group) #0.8089172
+
+#Regressão logística
+
+x <- ml_mutants_na[sample(1:nrow(ml_mutants_na)),]
+x$mutant <- x$group == "1" 
+x$group <- NULL
+model <- glm(mutant~ ., family = binomial(logit), data= x/10)
+model
+
+#Modelos não lineares
+
+x$group
+
+x$mutant
+
