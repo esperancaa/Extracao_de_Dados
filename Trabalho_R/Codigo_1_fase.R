@@ -42,6 +42,7 @@ data_rna_LGG <- GDCprepare(query_LGG, summarizedExperiment = TRUE, save = TRUE, 
 load("TCGA_LGG.rda")
 
 class(data_rna_LGG)
+str(data_rna_LGG, give.attr=FALSE)
 
 dim(data_rna_LGG)
 names(data_rna_LGG)
